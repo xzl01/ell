@@ -36,6 +36,7 @@ struct l_certchain;
 
 enum l_cert_key_type {
 	L_CERT_KEY_RSA,
+	L_CERT_KEY_ECC,
 	L_CERT_KEY_UNKNOWN,
 };
 
@@ -47,6 +48,8 @@ DEFINE_CLEANUP_FUNC(l_cert_free);
 
 const uint8_t *l_cert_get_der_data(struct l_cert *cert, size_t *out_len);
 const uint8_t *l_cert_get_dn(struct l_cert *cert, size_t *out_len);
+bool l_cert_get_valid_times(struct l_cert *cert, uint64_t *out_not_before_time,
+				uint64_t *out_not_after_time);
 enum l_cert_key_type l_cert_get_pubkey_type(struct l_cert *cert);
 struct l_key *l_cert_get_pubkey(struct l_cert *cert);
 

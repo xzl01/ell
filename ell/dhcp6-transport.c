@@ -35,16 +35,18 @@
 #include <net/if.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "private.h"
 #include "missing.h"
 #include "io.h"
+#include "time.h"
+#include "time-private.h"
 #include "dhcp6-private.h"
 
 struct dhcp6_default_transport {
 	struct dhcp6_transport super;
 	struct l_io *io;
-	int udp_fd;
 	uint16_t port;
 	struct in6_addr local;
 };
@@ -56,14 +58,40 @@ static bool _dhcp6_default_transport_read_handler(struct l_io *io,
 	int fd = l_io_get_fd(io);
 	char buf[2048];
 	ssize_t len;
+	uint64_t timestamp = 0;
+	struct cmsghdr *cmsg;
+	struct iovec iov = { .iov_base = buf, .iov_len = sizeof(buf) };
+	struct msghdr msg = {};
+	unsigned char control[32 + CMSG_SPACE(sizeof(struct timeval))];
 
-	len = read(fd, buf, sizeof(buf));
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = control;
+	msg.msg_controllen = sizeof(control);
+
+	len = recvmsg(fd, &msg, 0);
 	if (len < 0)
 		return false;
 
-	if (transport->super.rx_cb)
-		transport->super.rx_cb(&buf, len, transport->super.rx_data);
+	if (!transport->super.rx_cb)
+		return true;
 
+	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
+					cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+		if (cmsg->cmsg_level == SOL_SOCKET &&
+				cmsg->cmsg_type == SCM_TIMESTAMP &&
+				cmsg->cmsg_len ==
+				CMSG_LEN(sizeof(struct timeval))) {
+			const struct timeval *tv = (void *) CMSG_DATA(cmsg);
+
+			timestamp = _time_realtime_to_boottime(tv);
+		}
+	}
+
+	if (!timestamp)
+		timestamp = l_time_now();
+
+	transport->super.rx_cb(&buf, len, timestamp, transport->super.rx_data);
 	return true;
 }
 
@@ -146,6 +174,9 @@ static int kernel_raw_socket_open(uint32_t ifindex,
 			goto error;
 	}
 
+	if (setsockopt(s, SOL_SOCKET, SO_TIMESTAMP, &yes, sizeof(yes)) < 0)
+		goto error;
+
 	if (bind(s, (struct sockaddr *) &addr, sizeof(addr)) < 0)
 		goto error;
 
@@ -171,6 +202,11 @@ static int _dhcp6_default_transport_open(struct dhcp6_transport *s)
 		return fd;
 
 	transport->io = l_io_new(fd);
+	if (!transport->io) {
+		close(fd);
+		return -EMFILE;
+	}
+
 	l_io_set_close_on_destroy(transport->io, true);
 	l_io_set_read_handler(transport->io,
 					_dhcp6_default_transport_read_handler,
@@ -186,11 +222,6 @@ static void _dhcp6_default_transport_close(struct dhcp6_transport *s)
 
 	l_io_destroy(transport->io);
 	transport->io = NULL;
-
-	if (transport->udp_fd >= 0) {
-		L_TFR(close(transport->udp_fd));
-		transport->udp_fd = -1;
-	}
 }
 
 void _dhcp6_transport_set_rx_callback(struct dhcp6_transport *transport,

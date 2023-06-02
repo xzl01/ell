@@ -102,7 +102,8 @@ bool l_dhcp_client_set_event_handler(struct l_dhcp_client *client,
 
 bool l_dhcp_client_set_debug(struct l_dhcp_client *client,
 				l_dhcp_debug_cb_t function,
-				void *user_data, l_dhcp_destroy_cb_t destroy);
+				void *user_data, l_dhcp_destroy_cb_t destroy,
+				int priority);
 
 
 char *l_dhcp_lease_get_address(const struct l_dhcp_lease *lease);
@@ -122,6 +123,7 @@ const uint8_t *l_dhcp_lease_get_mac(const struct l_dhcp_lease *lease);
 uint32_t l_dhcp_lease_get_t1(const struct l_dhcp_lease *lease);
 uint32_t l_dhcp_lease_get_t2(const struct l_dhcp_lease *lease);
 uint32_t l_dhcp_lease_get_lifetime(const struct l_dhcp_lease *lease);
+uint64_t l_dhcp_lease_get_start_time(const struct l_dhcp_lease *lease);
 
 struct l_dhcp_server *l_dhcp_server_new(int ifindex);
 void l_dhcp_server_destroy(struct l_dhcp_server *server);

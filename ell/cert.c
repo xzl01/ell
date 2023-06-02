@@ -25,6 +25,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <time.h>
 
 #include "private.h"
 #include "useful.h"
@@ -33,6 +34,9 @@
 #include "asn1-private.h"
 #include "cipher.h"
 #include "pem-private.h"
+#include "time.h"
+#include "time-private.h"
+#include "utf8.h"
 #include "cert.h"
 #include "cert-private.h"
 #include "tls.h"
@@ -77,7 +81,15 @@ static const struct pkcs1_encryption_oid {
 } pkcs1_encryption_oids[] = {
 	{ /* rsaEncryption */
 		L_CERT_KEY_RSA,
-		{ 9, { 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01 } },
+		{ .asn1_len = 9, .asn1 = {
+			0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01 }
+		},
+	},
+	{ /* ecPublicKey */
+		L_CERT_KEY_ECC,
+		{ .asn1_len = 7, .asn1 = {
+			0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01 }
+		},
 	},
 };
 
@@ -178,6 +190,188 @@ LIB_EXPORT const uint8_t *l_cert_get_dn(struct l_cert *cert, size_t *out_len)
 						-1);
 }
 
+static uint64_t cert_parse_asn1_time(const uint8_t *data, size_t len,
+					uint8_t tag)
+{
+	struct tm tm = {};
+	int tz_hours;
+	int tz_mins;
+	int century;
+	int msecs = 0;
+	time_t tt;
+	unsigned int i;
+
+	for (i = 0; i < len && i < 15; i++)
+		if (unlikely(!l_ascii_isdigit(data[i])))
+			break;
+
+	if (tag == ASN1_ID_UTCTIME) {
+		if (unlikely(!L_IN_SET(i, 10, 12)))
+			return L_TIME_INVALID;
+
+		century = 19;
+	} else if (tag == ASN1_ID_GENERALIZEDTIME) {
+		if (unlikely(!L_IN_SET(i, 10, 12, 14)))
+			return L_TIME_INVALID;
+
+		century = (data[0] - '0') * 10 + (data[1] - '0');
+		if (century < 19)
+				return L_TIME_INVALID;
+
+		if (len >= i + 4 && data[i] == '.') {
+			if (unlikely(!l_ascii_isdigit(data[i + 1]) ||
+						!l_ascii_isdigit(data[i + 2]) ||
+						!l_ascii_isdigit(data[i + 3])))
+				return L_TIME_INVALID;
+
+			i++;
+			msecs += (data[i++] - '0') * 100;
+			msecs += (data[i++] - '0') * 10;
+			msecs += (data[i++] - '0');
+		}
+
+		data += 2;
+		len -= 2;
+		i -= 2;
+	} else
+		return L_TIME_INVALID;
+
+	if (unlikely((len != i + 1 || data[i] != 'Z') &&
+			(len != i + 5 || (data[i] != '+' && data[i] != '-'))))
+		return L_TIME_INVALID;
+
+	tm.tm_year = (data[0] - '0') * 10 + (data[1] - '0');
+	tm.tm_mon = (data[2] - '0') * 10 + (data[3] - '0');
+	tm.tm_mday = (data[4] - '0') * 10 + (data[5] - '0');
+	tm.tm_hour = (data[6] - '0') * 10 + (data[7] - '0');
+
+	if (unlikely(tm.tm_mon < 1 || tm.tm_mon > 12 ||
+				tm.tm_mday < 1 || tm.tm_mday > 31 ||
+				tm.tm_hour > 23))
+		return L_TIME_INVALID;
+
+	if (i >= 10) {
+		tm.tm_min = (data[8] - '0') * 10 + (data[9] - '0');
+		if (unlikely(tm.tm_min > 59))
+			return L_TIME_INVALID;
+	}
+
+	if (i >= 12) {
+		tm.tm_sec = (data[10] - '0') * 10 + (data[11] - '0');
+		if (unlikely(tm.tm_sec > 59))
+			return L_TIME_INVALID;
+	}
+
+	/* RFC5280 Section 4.1.2.5.1 */
+	if (tag == ASN1_ID_UTCTIME && tm.tm_year < 50)
+		century = 20;
+
+	tm.tm_year += (century - 19) * 100;
+
+	/* Month number is 1-based in UTCTime and 0-based in struct tm */
+	tm.tm_mon -= 1;
+
+	tt = timegm(&tm);
+	if (unlikely(tt == (time_t) -1))
+		return L_TIME_INVALID;
+
+	if (len == i + 5) {
+		data += i;
+
+		for (i = 1; i < 5; i++)
+			if (unlikely(!l_ascii_isdigit(data[i])))
+				return L_TIME_INVALID;
+
+		tz_hours = (data[1] - '0') * 10 + (data[2] - '0');
+		tz_mins = (data[3] - '0') * 10 + (data[4] - '0');
+
+		if (unlikely(tz_hours > 14 || tz_mins > 59))
+			return L_TIME_INVALID;
+
+		/* The sign converts UTC to local so invert it */
+		if (data[0] == '+')
+			tt -= tz_hours * 3600 + tz_mins * 60;
+		else
+			tt += tz_hours * 3600 + tz_mins * 60;
+	}
+
+	return (uint64_t) tt * L_USEC_PER_SEC + msecs * L_USEC_PER_MSEC;
+}
+
+LIB_EXPORT bool l_cert_get_valid_times(struct l_cert *cert,
+					uint64_t *out_not_before_time,
+					uint64_t *out_not_after_time)
+{
+	const uint8_t *validity;
+	const uint8_t *not_before;
+	const uint8_t *not_after;
+	size_t seq_size;
+	size_t not_before_size;
+	size_t not_after_size;
+	uint8_t not_before_tag;
+	uint8_t not_after_tag;
+	uint64_t not_before_time = 0;
+	uint64_t not_after_time = 0;
+
+	if (unlikely(!cert))
+		return false;
+
+	validity = asn1_der_find_elem_by_path(cert->asn1, cert->asn1_len,
+						ASN1_ID_SEQUENCE, &seq_size,
+						X509_CERTIFICATE_POS,
+						X509_TBSCERTIFICATE_POS,
+						X509_TBSCERT_VALIDITY_POS,
+						-1);
+	if (unlikely(!validity))
+		return false;
+
+	not_before = asn1_der_find_elem(validity, seq_size, 0, &not_before_tag,
+					&not_before_size);
+	if (!not_before)
+		return false;
+
+	seq_size -= not_before_size + (not_before - validity);
+	validity = not_before + not_before_size;
+	not_after = asn1_der_find_elem(validity, seq_size, 0, &not_after_tag,
+					&not_after_size);
+	if (!not_after)
+		return false;
+
+	if (out_not_before_time) {
+		not_before_time = cert_parse_asn1_time(not_before,
+							not_before_size,
+							not_before_tag);
+		if (not_before_time == L_TIME_INVALID)
+			return false;
+	}
+
+	if (out_not_after_time) {
+		/*
+		 * RFC5280 Section 4.1.2.5: "To indicate that a certificate
+		 * has no well-defined expiration date, the notAfter SHOULD
+		 * be assigned the GeneralizedTime value of 99991231235959Z."
+		 */
+		if (not_after_size == 15 &&
+				!memcmp(not_after, "99991231235959Z", 15))
+			not_after_time = 0;
+		else {
+			not_after_time = cert_parse_asn1_time(not_after,
+								not_after_size,
+								not_after_tag);
+			if (not_after_time == L_TIME_INVALID)
+				return false;
+		}
+	}
+
+	if (out_not_before_time)
+		*out_not_before_time = not_before_time;
+
+	if (out_not_after_time)
+		*out_not_after_time = not_after_time;
+
+	return true;
+}
+
 const uint8_t *cert_get_extension(struct l_cert *cert,
 					const struct asn1_oid *ext_id,
 					bool *out_critical, size_t *out_len)
@@ -261,8 +455,14 @@ LIB_EXPORT struct l_key *l_cert_get_pubkey(struct l_cert *cert)
 		return NULL;
 
 	/* Use kernel's ASN.1 certificate parser to find the key data for us */
-	if (cert->pubkey_type == L_CERT_KEY_RSA)
+	switch (cert->pubkey_type) {
+	case L_CERT_KEY_RSA:
 		return l_key_new(L_KEY_RSA, cert->asn1, cert->asn1_len);
+	case L_CERT_KEY_ECC:
+		return l_key_new(L_KEY_ECC, cert->asn1, cert->asn1_len);
+	case L_CERT_KEY_UNKNOWN:
+		break;
+	}
 
 	return NULL;
 }
@@ -363,24 +563,25 @@ LIB_EXPORT void l_certchain_walk_from_ca(struct l_certchain *chain,
 			break;
 }
 
-static struct l_keyring *cert_set_to_keyring(struct l_queue *certs, char *error)
+static struct l_keyring *cert_set_to_keyring(struct l_cert **certs, char *error)
 {
 	struct l_keyring *ring;
-	const struct l_queue_entry *entry;
 	int i = 1;
+	int count;
 
 	ring = l_keyring_new();
 	if (!ring)
 		return NULL;
 
-	for (entry = l_queue_get_entries(certs); entry; entry = entry->next) {
-		struct l_cert *cert = entry->data;
+	for (count = 0; certs[count]; count++);
+
+	for (; *certs; certs++) {
+		struct l_cert *cert = *certs;
 		struct l_key *key = l_cert_get_pubkey(cert);
 
 		if (!key) {
 			sprintf(error, "Can't get public key from certificate "
-				"%i / %i in certificate set", i,
-				l_queue_length(certs));
+				"%i / %i in certificate set", i, count);
 			goto cleanup;
 		}
 
@@ -388,7 +589,7 @@ static struct l_keyring *cert_set_to_keyring(struct l_queue *certs, char *error)
 			l_key_free(key);
 			sprintf(error, "Can't link the public key from "
 				"certificate %i / %i to target keyring",
-				i, l_queue_length(certs));
+				i, count);
 			goto cleanup;
 		}
 
@@ -403,12 +604,10 @@ cleanup:
 	return NULL;
 }
 
-static bool cert_is_in_set(struct l_cert *cert, struct l_queue *set)
+static bool cert_is_in_set(struct l_cert *cert, struct l_cert **set)
 {
-	const struct l_queue_entry *entry;
-
-	for (entry = l_queue_get_entries(set); entry; entry = entry->next) {
-		struct l_cert *cert2 = entry->data;
+	for (; *set; set++) {
+		struct l_cert *cert2 = *set;
 
 		if (cert == cert2)
 			return true;
@@ -420,6 +619,35 @@ static bool cert_is_in_set(struct l_cert *cert, struct l_queue *set)
 	}
 
 	return false;
+}
+
+static struct l_cert **cert_set_filter_by_validity(struct l_queue *set,
+							uint64_t now,
+							int *out_total,
+							int *out_valid)
+{
+	const struct l_queue_entry *entry;
+	_auto_(l_free) struct l_cert **valid;
+
+	*out_total = l_queue_length(set);
+	*out_valid = 0;
+	valid = l_new(struct l_cert *, *out_total + 1);
+
+	for (entry = l_queue_get_entries(set); entry; entry = entry->next) {
+		struct l_cert *cert = entry->data;
+		uint64_t not_before;
+		uint64_t not_after;
+
+		if (!l_cert_get_valid_times(cert, &not_before, &not_after))
+			return NULL;
+
+		if (now < not_before || (not_after && now > not_after))
+			continue;
+
+		valid[(*out_valid)++] = cert;
+	}
+
+	return l_steal_ptr(valid);
 }
 
 static struct l_key *cert_try_link(struct l_cert *cert, struct l_keyring *ring)
@@ -456,21 +684,80 @@ LIB_EXPORT bool l_certchain_verify(struct l_certchain *chain,
 	struct l_key *prev_key = NULL;
 	int verified = 0;
 	int ca_match = 0;
-	int i = 0;
-	static char error_buf[200];
+	int i;
+	static char error_buf[1024];
+	int total = 0;
+	uint64_t now;
+	_auto_(l_free) struct l_cert **ca_certs_valid = NULL;
+	int ca_certs_total_count = 0;
+	int ca_certs_valid_count = 0;
 
 	if (unlikely(!chain || !chain->leaf))
 		RETURN_ERROR("Chain empty");
 
+	for (cert = chain->ca; cert; cert = cert->issued, total++);
+
+	now = time_realtime_now();
+
+	for (cert = chain->ca, i = 0; cert; cert = cert->issued, i++) {
+		uint64_t not_before;
+		uint64_t not_after;
+		char time_str[100];
+
+		if (unlikely(!l_cert_get_valid_times(cert, &not_before,
+							&not_after)))
+			RETURN_ERROR("Can't parse validity in certificate "
+					"%i / %i", i + 1, total);
+
+		if (unlikely(now < not_before)) {
+			time_t t = not_before / L_USEC_PER_SEC;
+			struct tm *tm = gmtime(&t);
+
+			if (!tm || !strftime(time_str, sizeof(time_str),
+						"%a %F %T UTC", tm))
+				strcpy(time_str, "<error>");
+
+			RETURN_ERROR("Certificate %i / %i not valid before %s",
+					i + 1, total, time_str);
+		}
+
+		if (unlikely(not_after && now > not_after)) {
+			time_t t = not_after / L_USEC_PER_SEC;
+			struct tm *tm = gmtime(&t);
+
+			if (!tm || !strftime(time_str, sizeof(time_str),
+						"%a %F %T UTC", tm))
+				strcpy(time_str, "<error>");
+
+			RETURN_ERROR("Certificate %i / %i expired on %s",
+					i + 1, total, time_str);
+		}
+	}
+
+	if (ca_certs) {
+		if (unlikely(l_queue_isempty(ca_certs)))
+			RETURN_ERROR("No trusted CA certificates");
+
+		ca_certs_valid = cert_set_filter_by_validity(ca_certs, now,
+							&ca_certs_total_count,
+							&ca_certs_valid_count);
+		if (unlikely(!ca_certs_valid))
+			RETURN_ERROR("Can't parse validity in CA cert(s)");
+
+		if (unlikely(!ca_certs_valid_count))
+			RETURN_ERROR("All trusted CA certs are expired or "
+					"not-yet-valid");
+
+		for (cert = chain->ca, i = 0; cert; cert = cert->issued, i++)
+			if (cert_is_in_set(cert, ca_certs_valid)) {
+				ca_match = i + 1;
+				break;
+			}
+	}
+
 	verify_ring = l_keyring_new();
 	if (!verify_ring)
 		RETURN_ERROR("Can't create verify keyring");
-
-	for (cert = chain->ca; cert; cert = cert->issued, i++)
-		if (cert_is_in_set(cert, ca_certs)) {
-			ca_match = i + 1;
-			break;
-		}
 
 	cert = chain->ca;
 
@@ -491,7 +778,7 @@ LIB_EXPORT bool l_certchain_verify(struct l_certchain *chain,
 	 * all of the trusted certificates into the kernel, link them
 	 * to @ca_ring or link @ca_ring to @verify_ring, instead we
 	 * load the first certificate into @verify_ring before we set
-	 * the restric mode on it, same as when no trusted CAs are
+	 * the restrict mode on it, same as when no trusted CAs are
 	 * provided.
 	 *
 	 * Note this happens to work around a kernel issue preventing
@@ -502,7 +789,7 @@ LIB_EXPORT bool l_certchain_verify(struct l_certchain *chain,
 	 * the chain.
 	 */
 	if (ca_certs && !ca_match) {
-		ca_ring = cert_set_to_keyring(ca_certs, error_buf);
+		ca_ring = cert_set_to_keyring(ca_certs_valid, error_buf);
 		if (!ca_ring) {
 			if (error)
 				*error = error_buf;
@@ -555,23 +842,28 @@ LIB_EXPORT bool l_certchain_verify(struct l_certchain *chain,
 	}
 
 	if (!prev_key) {
-		int total = 0;
-		char str[100];
-
-		for (cert = chain->ca; cert; cert = cert->issued, total++);
+		char str1[100];
+		char str2[100] = "";
 
 		if (ca_match)
-			snprintf(str, sizeof(str), "%i / %i matched a trusted "
-					"certificate, root not verified",
+			snprintf(str1, sizeof(str1), "%i / %i matched a trusted"
+					" certificate, root not verified",
 					ca_match, total);
 		else
-			snprintf(str, sizeof(str), "root %sverified against "
+			snprintf(str1, sizeof(str1), "root %sverified against "
 					"trusted CA(s)",
-					ca_certs && !ca_match && verified ? "" :
-					"not ");
+					ca_certs && verified ? "" : "not ");
 
-		RETURN_ERROR("Linking certificate %i / %i failed, %s",
-				verified + 1, total, str);
+		if (ca_certs && !ca_match && !verified &&
+				ca_certs_valid_count < ca_certs_total_count)
+			snprintf(str2, sizeof(str2), ", %i out of %i trused "
+					"CA(s) were expired or not-yet-valid",
+					ca_certs_total_count -
+					ca_certs_valid_count,
+					ca_certs_total_count);
+
+		RETURN_ERROR("Linking certificate %i / %i failed, %s%s",
+				verified + 1, total, str1, str2);
 	}
 
 	l_key_free(prev_key);

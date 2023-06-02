@@ -32,12 +32,17 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <ell/ell.h>
+#include <ell/useful.h>
 
 static struct l_io *io;
 static struct l_tls *tls;
 bool served;
+static struct l_settings *session_cache;
+static char *session_cache_path;
 
 static void https_io_disconnect(struct l_io *io, void *user_data)
 {
@@ -113,6 +118,27 @@ static void https_tls_ready(const char *peer_identity, void *user_data)
 static void https_tls_debug_cb(const char *str, void *user_data)
 {
 	printf("%s\n", str);
+}
+
+static void https_tls_session_cache_update_cb(void *user_data)
+{
+	size_t len;
+	char *data = l_settings_to_data(session_cache, &len);
+	_auto_(close) int fd = L_TFR(creat(session_cache_path, 0600));
+
+	if (!data) {
+		fprintf(stderr, "l_settings_to_data() failed\n");
+		return;
+	}
+
+	if (fd < 0) {
+		fprintf(stderr, "can't open %s: %s\n",
+			session_cache_path, strerror(errno));
+		return;
+	}
+
+	if (L_TFR(write(fd, data, len)) < (ssize_t) len)
+		fprintf(stderr, "short write to %s\n", session_cache_path);
 }
 
 int main(int argc, char *argv[])
@@ -208,6 +234,23 @@ int main(int argc, char *argv[])
 		str = l_strdup_printf("/tmp/ell-certchain-%s.pem", buf);
 		l_tls_set_cert_dump_path(tls, str);
 		l_free(str);
+	}
+
+	if (getenv("TLS_CACHE")) {
+		const char *homedir = getenv("HOME");
+
+		if (!homedir)
+			homedir = "/tmp";
+
+		session_cache_path =
+			l_strdup_printf("%s/.ell-https-server-test", homedir);
+		session_cache = l_settings_new();
+		l_settings_load_from_file(session_cache, session_cache_path);
+
+		l_tls_set_session_cache(tls, session_cache, "tls-session",
+					24 * 3600 * L_USEC_PER_SEC, 10,
+					https_tls_session_cache_update_cb,
+					NULL);
 	}
 
 	auth_ok = l_tls_set_auth_data(tls, cert, priv_key) &&

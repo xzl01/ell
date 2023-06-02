@@ -112,7 +112,7 @@ struct tls_mac_algorithm {
 struct tls_cipher_suite {
 	uint8_t id[2];
 	const char *name;
-	int verify_data_length;
+	size_t verify_data_length;
 
 	struct tls_bulk_encryption_algorithm *encryption;
 	struct tls_signature_algorithm *signature;
@@ -218,6 +218,13 @@ struct l_tls {
 
 	struct tls_cipher_suite **cipher_suite_pref_list;
 
+	struct l_settings *session_settings;
+	char *session_prefix;
+	uint64_t session_lifetime;
+	unsigned int session_count_max;
+	l_tls_session_update_cb_t session_update_cb;
+	void *session_update_user_data;
+
 	bool in_callback;
 	bool pending_destroy;
 
@@ -250,6 +257,23 @@ struct l_tls {
 	const struct tls_hash_algorithm *prf_hmac;
 	const struct tls_named_group *negotiated_curve;
 	const struct tls_named_group *negotiated_ff_group;
+
+	uint8_t session_id[32];
+	size_t session_id_size;
+	uint8_t session_id_replaced[32];
+	size_t session_id_size_replaced;
+	bool session_id_new;
+	uint8_t session_cipher_suite_id[2];
+	uint8_t session_compression_method_id;
+	char *session_peer_identity;
+	bool session_resumed;
+
+	struct {
+		bool secure_renegotiation;
+		/* Max .verify_data_length over supported cipher suites */
+		uint8_t client_verify_data[12];
+		uint8_t server_verify_data[12];
+	} renegotiation_info;
 
 	/* SecurityParameters current and pending */
 
@@ -324,6 +348,8 @@ bool tls_set_cipher_suites(struct l_tls *tls, const char **suite_list);
 void tls_generate_master_secret(struct l_tls *tls,
 				const uint8_t *pre_master_secret,
 				int pre_master_secret_len);
+
+size_t tls_verify_data_length(struct l_tls *tls, unsigned int index);
 
 const struct tls_named_group *tls_find_group(uint16_t id);
 const struct tls_named_group *tls_find_ff_group(const uint8_t *prime,

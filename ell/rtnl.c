@@ -38,8 +38,12 @@
 #include "netlink.h"
 #include "log.h"
 #include "util.h"
+#include "time.h"
+#include "rtnl-private.h"
 #include "rtnl.h"
 #include "private.h"
+
+static struct l_netlink *rtnl;
 
 struct l_rtnl_address {
 	uint8_t family;
@@ -53,6 +57,8 @@ struct l_rtnl_address {
 	char label[IFNAMSIZ];
 	uint32_t preferred_lifetime;
 	uint32_t valid_lifetime;
+	uint64_t preferred_expiry_time;
+	uint64_t valid_expiry_time;
 	uint32_t flags;
 };
 
@@ -70,7 +76,7 @@ static inline int address_to_string(int family, const struct in_addr *v4,
 			return -errno;
 		break;
 	default:
-		return  false;
+		return -EAFNOSUPPORT;
 	}
 
 	return 0;
@@ -110,6 +116,8 @@ static inline void _rtnl_address_init(struct l_rtnl_address *addr,
 	memset(addr->label, 0, sizeof(addr->label));
 	addr->preferred_lifetime = 0;
 	addr->valid_lifetime = 0;
+	addr->preferred_expiry_time = 0;
+	addr->valid_expiry_time = 0;
 
 	l_rtnl_address_set_broadcast(addr, NULL);
 }
@@ -170,6 +178,15 @@ LIB_EXPORT bool l_rtnl_address_get_address(const struct l_rtnl_address *addr,
 	return !address_to_string(addr->family, &addr->in_addr,
 						&addr->in6_addr,
 						out_buf);
+}
+
+LIB_EXPORT const void *l_rtnl_address_get_in_addr(
+					const struct l_rtnl_address *addr)
+{
+	if (unlikely(!addr))
+		return NULL;
+
+	return addr->family == AF_INET ? (void *) &addr->in_addr : &addr->in6_addr;
 }
 
 LIB_EXPORT uint8_t l_rtnl_address_get_family(const struct l_rtnl_address *addr)
@@ -276,12 +293,45 @@ LIB_EXPORT bool l_rtnl_address_set_lifetimes(struct l_rtnl_address *addr,
 						uint32_t preferred_lifetime,
 						uint32_t valid_lifetime)
 {
+	uint64_t now = l_time_now();
+
 	if (unlikely(!addr))
 		return false;
 
 	addr->preferred_lifetime = preferred_lifetime;
 	addr->valid_lifetime = valid_lifetime;
+	addr->preferred_expiry_time = preferred_lifetime ?
+		now + preferred_lifetime * L_USEC_PER_SEC : 0;
+	addr->valid_expiry_time = valid_lifetime ?
+		now + valid_lifetime * L_USEC_PER_SEC : 0;
+	return true;
+}
 
+LIB_EXPORT bool l_rtnl_address_get_expiry(const struct l_rtnl_address *addr,
+						uint64_t *preferred_expiry_time,
+						uint64_t *valid_expiry_time)
+{
+	if (unlikely(!addr))
+		return false;
+
+	if (preferred_expiry_time)
+		*preferred_expiry_time = addr->preferred_expiry_time;
+
+	if (valid_expiry_time)
+		*valid_expiry_time = addr->valid_expiry_time;
+
+	return true;
+}
+
+LIB_EXPORT bool l_rtnl_address_set_expiry(struct l_rtnl_address *addr,
+						uint64_t preferred_expiry_time,
+						uint64_t valid_expiry_time)
+{
+	if (unlikely(!addr))
+		return false;
+
+	addr->preferred_expiry_time = preferred_expiry_time;
+	addr->valid_expiry_time = valid_expiry_time;
 	return true;
 }
 
@@ -294,29 +344,6 @@ LIB_EXPORT bool l_rtnl_address_set_scope(struct l_rtnl_address *addr,
 	addr->scope = scope;
 	return true;
 }
-
-struct l_rtnl_route {
-	uint8_t family;
-	uint8_t scope;
-	uint8_t protocol;
-	union {
-		struct in6_addr in6_addr;
-		struct in_addr in_addr;
-	} gw;
-	union {
-		struct in6_addr in6_addr;
-		struct in_addr in_addr;
-	} dst;
-	uint8_t dst_prefix_len;
-	union {
-		struct in6_addr in6_addr;
-		struct in_addr in_addr;
-	} prefsrc;
-	uint32_t lifetime;
-	uint32_t mtu;
-	uint32_t priority;
-	uint8_t preference;
-};
 
 LIB_EXPORT struct l_rtnl_route *l_rtnl_route_new_gateway(const char *gw)
 {
@@ -380,6 +407,40 @@ LIB_EXPORT struct l_rtnl_route *l_rtnl_route_new_prefix(const char *ip,
 	return rt;
 }
 
+LIB_EXPORT struct l_rtnl_route *l_rtnl_route_new_static(const char *gw,
+							const char *ip,
+							uint8_t prefix_len)
+{
+	struct in_addr gw_addr4;
+	struct in6_addr gw_addr6;
+	struct in_addr dst_addr4;
+	struct in6_addr dst_addr6;
+	int family;
+	struct l_rtnl_route *rt;
+
+	if ((family = address_get(gw, &gw_addr4, &gw_addr6)) < 0)
+		return NULL;
+
+	if (address_get(ip, &dst_addr4, &dst_addr6) != family)
+		return NULL;
+
+	if (prefix_len == 0 || prefix_len > (family == AF_INET ? 32 : 128))
+		return NULL;
+
+	rt = l_rtnl_route_new_gateway(gw);
+	if (!rt)
+		return rt;
+
+	rt->dst_prefix_len = prefix_len;
+
+	if (family == AF_INET6)
+		memcpy(&rt->dst.in6_addr, &dst_addr6, sizeof(dst_addr6));
+	else
+		memcpy(&rt->dst.in_addr, &dst_addr4, sizeof(dst_addr4));
+
+	return rt;
+}
+
 LIB_EXPORT void l_rtnl_route_free(struct l_rtnl_route *rt)
 {
 	l_free(rt);
@@ -399,8 +460,56 @@ LIB_EXPORT bool l_rtnl_route_get_gateway(const struct l_rtnl_route *rt,
 	if (unlikely(!rt))
 		return false;
 
+	if (address_is_null(rt->family, &rt->gw.in_addr, &rt->gw.in6_addr))
+		return false;
+
 	return !address_to_string(rt->family, &rt->gw.in_addr, &rt->gw.in6_addr,
 					out_buf);
+}
+
+LIB_EXPORT const void *l_rtnl_route_get_gateway_in_addr(
+						const struct l_rtnl_route *rt)
+{
+	if (unlikely(!rt))
+		return NULL;
+
+	if (address_is_null(rt->family, &rt->gw.in_addr, &rt->gw.in6_addr))
+		return NULL;
+
+	if (rt->family == AF_INET)
+		return &rt->gw.in_addr;
+	else
+		return &rt->gw.in6_addr;
+}
+
+LIB_EXPORT bool l_rtnl_route_get_dst(const struct l_rtnl_route *rt,
+						char *out_buf,
+						uint8_t *out_prefix_len)
+{
+	if (unlikely(!rt))
+		return false;
+
+	if (address_to_string(rt->family, &rt->dst.in_addr, &rt->dst.in6_addr,
+					out_buf) != 0)
+		return false;
+
+	*out_prefix_len = rt->dst_prefix_len;
+	return true;
+}
+
+LIB_EXPORT const void *l_rtnl_route_get_dst_in_addr(
+						const struct l_rtnl_route *rt,
+						uint8_t *out_prefix_len)
+{
+	if (unlikely(!rt))
+		return NULL;
+
+	*out_prefix_len = rt->dst_prefix_len;
+
+	if (rt->family == AF_INET)
+		return &rt->dst.in_addr;
+	else
+		return &rt->dst.in6_addr;
 }
 
 LIB_EXPORT uint32_t l_rtnl_route_get_lifetime(const struct l_rtnl_route *rt)
@@ -417,6 +526,23 @@ LIB_EXPORT bool l_rtnl_route_set_lifetime(struct l_rtnl_route *rt, uint32_t lt)
 		return false;
 
 	rt->lifetime = lt;
+	rt->expiry_time = lt ? l_time_now() + lt * L_USEC_PER_SEC : 0;
+
+	return true;
+}
+
+LIB_EXPORT uint64_t l_rtnl_route_get_expiry(const struct l_rtnl_route *rt)
+{
+	return rt->expiry_time;
+}
+
+LIB_EXPORT bool l_rtnl_route_set_expiry(struct l_rtnl_route *rt,
+					uint64_t expiry_time)
+{
+	if (unlikely(!rt))
+		return false;
+
+	rt->expiry_time = expiry_time;
 	return true;
 }
 
@@ -451,9 +577,8 @@ LIB_EXPORT bool l_rtnl_route_set_preference(struct l_rtnl_route *rt,
 	if (unlikely(!rt))
 		return false;
 
-	if (preference != ICMPV6_ROUTER_PREF_LOW &&
-			preference != ICMPV6_ROUTER_PREF_HIGH &&
-			preference != ICMPV6_ROUTER_PREF_MEDIUM)
+	if (!L_IN_SET(preference, ICMPV6_ROUTER_PREF_LOW,
+			ICMPV6_ROUTER_PREF_HIGH, ICMPV6_ROUTER_PREF_MEDIUM))
 		return false;
 
 	rt->preference = preference;
@@ -469,7 +594,6 @@ LIB_EXPORT bool l_rtnl_route_get_prefsrc(const struct l_rtnl_route *rt,
 	if (address_is_null(rt->family, &rt->prefsrc.in_addr,
 					&rt->prefsrc.in6_addr))
 		return false;
-
 
 	return !address_to_string(rt->family, &rt->prefsrc.in_addr,
 						&rt->prefsrc.in6_addr,
@@ -515,7 +639,7 @@ LIB_EXPORT uint8_t l_rtnl_route_get_protocol(const struct l_rtnl_route *rt)
 	if (unlikely(!rt))
 		return RTPROT_UNSPEC;
 
-	return rt->scope;
+	return rt->protocol;
 }
 
 LIB_EXPORT bool l_rtnl_route_set_protocol(struct l_rtnl_route *rt,
@@ -947,7 +1071,6 @@ LIB_EXPORT void l_rtnl_ifaddr6_extract(const struct ifaddrmsg *ifa, int len,
 
 			if (!inet_ntop(AF_INET6, &in6_addr, address,
 							INET6_ADDRSTRLEN)) {
-
 				l_error("rtnl: Failed to extract IPv6 address");
 				break;
 			}
@@ -1087,6 +1210,7 @@ static uint32_t _rtnl_ifaddr_change(struct l_netlink *rtnl, uint16_t nlmsg_type,
 	size_t bufsize;
 	uint32_t id;
 	int flags = 0;
+	uint64_t now = l_time_now();
 
 	if  (nlmsg_type == RTM_NEWADDR)
 		flags = NLM_F_CREATE | NLM_F_REPLACE;
@@ -1130,12 +1254,15 @@ static uint32_t _rtnl_ifaddr_change(struct l_netlink *rtnl, uint16_t nlmsg_type,
 		buf += rta_add_data(buf, IFA_LABEL,
 					addr->label, strlen(addr->label) + 1);
 
-	if (addr->preferred_lifetime || addr->valid_lifetime) {
+	if (addr->preferred_expiry_time > now ||
+			addr->valid_expiry_time > now) {
 		struct ifa_cacheinfo cinfo;
 
 		memset(&cinfo, 0, sizeof(cinfo));
-		cinfo.ifa_prefered = addr->preferred_lifetime;
-		cinfo.ifa_valid = addr->valid_lifetime;
+		cinfo.ifa_prefered = addr->preferred_expiry_time > now ?
+			l_time_to_secs(addr->preferred_expiry_time - now) : 0;
+		cinfo.ifa_valid =  addr->valid_expiry_time > now ?
+			l_time_to_secs(addr->valid_expiry_time - now) : 0;
 
 		buf += rta_add_data(buf, IFA_CACHEINFO, &cinfo, sizeof(cinfo));
 	}
@@ -1193,8 +1320,8 @@ LIB_EXPORT struct l_rtnl_address *l_rtnl_ifaddr_extract(
 			break;
 		case IFA_CACHEINFO:
 			cinfo = RTA_DATA(attr);
-			addr->preferred_lifetime = cinfo->ifa_prefered;
-			addr->valid_lifetime = cinfo->ifa_valid;
+			l_rtnl_address_set_lifetimes(addr, cinfo->ifa_prefered,
+							cinfo->ifa_valid);
 			break;
 		}
 	}
@@ -1233,6 +1360,7 @@ static uint32_t _rtnl_route_change(struct l_netlink *rtnl,
 	size_t bufsize;
 	void *rta_buf;
 	uint16_t flags;
+	uint64_t now = l_time_now();
 
 	bufsize = NLMSG_ALIGN(sizeof(struct rtmsg)) +
 			RTA_SPACE(sizeof(uint32_t)) +        /* RTA_OIF */
@@ -1288,8 +1416,9 @@ static uint32_t _rtnl_route_change(struct l_netlink *rtnl,
 	if (rt->preference)
 		rta_buf += rta_add_u8(rta_buf, RTA_PREF, rt->preference);
 
-	if (rt->lifetime != 0xffffffff)
-		rta_buf += rta_add_u32(rta_buf, RTA_EXPIRES, rt->lifetime);
+	if (rt->expiry_time > now)
+		rta_buf += rta_add_u32(rta_buf, RTA_EXPIRES,
+					l_time_to_secs(rt->expiry_time - now));
 
 	return l_netlink_send(rtnl, nlmsg_type, flags, rtmmsg,
 				rta_buf - (void *) rtmmsg, cb, user_data,
@@ -1437,4 +1566,17 @@ LIB_EXPORT uint32_t l_rtnl_neighbor_set_hwaddr(struct l_netlink *rtnl,
 	return l_netlink_send(rtnl, RTM_NEWNEIGH, NLM_F_CREATE | NLM_F_REPLACE,
 				ndmsg, rta_buf - (void *) ndmsg,
 				cb, user_data, destroy);
+}
+
+__attribute__((destructor(32000))) static void free_rtnl()
+{
+	l_netlink_destroy(rtnl);
+}
+
+LIB_EXPORT struct l_netlink *l_rtnl_get()
+{
+	if (!rtnl)
+		rtnl = l_netlink_new(NETLINK_ROUTE);
+
+	return rtnl;
 }

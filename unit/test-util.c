@@ -39,6 +39,24 @@ static void test_hexstring(const void *test_data)
 	l_free(hex);
 }
 
+static void test_hexstringv(const void *test_data)
+{
+	unsigned char test1[] = { 0x74, 0x65, 0x73, 0x74, 0x00 };
+	unsigned char test2[] = { 0x74, 0x65, 0x73 };
+	struct iovec iov[2];
+	char *hex;
+
+	iov[0].iov_base = test1;
+	iov[0].iov_len = 5;
+	iov[1].iov_base = test2;
+	iov[1].iov_len = 3;
+
+	hex = l_util_hexstringv(iov, 2);
+	assert(hex);
+	assert(!strcmp(hex, "7465737400746573"));
+	l_free(hex);
+}
+
 static void test_hexstring_upper(const void *test_data)
 {
 	unsigned char test[] = { 0x0a, 0x0b, 0x0c, 0xde, 0xf2 };
@@ -151,6 +169,7 @@ int main(int argc, char *argv[])
 
 	l_test_add("l_util_hexstring", test_hexstring, NULL);
 	l_test_add("l_util_hexstring_upper", test_hexstring_upper, NULL);
+	l_test_add("l_util_hexstringv", test_hexstringv, NULL);
 	l_test_add("l_util_from_hexstring", test_from_hexstring, NULL);
 
 	l_test_add("l_util_has_suffix", test_has_suffix, NULL);

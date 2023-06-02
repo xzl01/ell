@@ -49,7 +49,7 @@ _Pragma("GCC diagnostic pop")						\
 
 #define L_WARN_ON(condition) __extension__ ({				\
 		bool r = !!(condition);					\
-		if (r)							\
+		if (__builtin_expect(r, 0))				\
 			l_warn("WARNING: %s:%s() condition %s failed",	\
 				__FILE__, __func__,			\
 				#condition);				\
@@ -282,6 +282,8 @@ bool l_streq0(const char *a, const char *b);
 
 char *l_util_hexstring(const void *buf, size_t len);
 char *l_util_hexstring_upper(const void *buf, size_t len);
+char *l_util_hexstringv(const struct iovec *iov, size_t n_iov);
+char *l_util_hexstringv_upper(const struct iovec *iov, size_t n_iov);
 unsigned char *l_util_from_hexstring(const char *str, size_t *out_len);
 
 typedef void (*l_util_hexdump_func_t) (const char *str, void *user_data);
@@ -323,7 +325,7 @@ const char *l_util_get_debugfs_path(void);
 	_L_IN_SET_CMP((val), __auto_type, __v == __elems[__i], ##__VA_ARGS__)
 
 #define L_IN_STRSET(val, ...)						\
-	_L_IN_SET_CMP((val), const char *, __v == __elems[__i] ||	\
+	_L_IN_SET_CMP((val), char *, __v == __elems[__i] ||		\
 				(__v && __elems[__i] &&			\
 				 !strcmp(__v, __elems[__i])), ##__VA_ARGS__)
 

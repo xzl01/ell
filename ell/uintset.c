@@ -533,6 +533,43 @@ LIB_EXPORT struct l_uintset *l_uintset_intersect(const struct l_uintset *set_a,
 }
 
 /**
+ * l_uintset_subtract:
+ * @set_a: The set of numbers
+ * @set_b: The set of numbers to subtract from set_a
+ *
+ * Subtracts two sets of numbers of an equal base, e.g.:
+ * l_uintset_get_min(set_a) must be equal to l_uintset_get_min(set_b) and
+ * l_uintset_get_max(set_a) must be equal to l_uintset_get_max(set_b)
+ *
+ * Returns: A newly allocated l_uintset containing set_a - set_b
+ */
+LIB_EXPORT struct l_uintset *l_uintset_subtract(const struct l_uintset *set_a,
+						const struct l_uintset *set_b)
+{
+	struct l_uintset *subtraction;
+	uint32_t offset;
+	uint32_t offset_max;
+
+	if (unlikely(!set_a || !set_b))
+		return NULL;
+
+	if (unlikely(set_a->min != set_b->min || set_a->max != set_b->max))
+		return NULL;
+
+	subtraction = l_uintset_new_from_range(set_a->min, set_a->max);
+
+	offset_max = (set_a->size + BITS_PER_LONG - 1) / BITS_PER_LONG;
+
+	/* Subtract by: set_a & ~set_b */
+	for (offset = 0; offset < offset_max; offset++) {
+		subtraction->bits[offset] =
+				set_a->bits[offset] & ~(set_b->bits[offset]);
+	}
+
+	return subtraction;
+}
+
+/**
  * l_uintset_isempty
  * @set: The set of numbers
  *
@@ -554,4 +591,28 @@ LIB_EXPORT bool l_uintset_isempty(const struct l_uintset *set)
 	}
 
 	return true;
+}
+
+/**
+ * l_uintset_size
+ *
+ * @set: The set of numbers
+ *
+ * Returns the number of set elements
+ */
+LIB_EXPORT uint32_t l_uintset_size(const struct l_uintset *set)
+{
+	uint16_t i;
+	uint32_t offset_max;
+	uint32_t count = 0;
+
+	if (unlikely(!set))
+		return 0;
+
+	offset_max = (set->size + BITS_PER_LONG - 1) / BITS_PER_LONG;
+
+	for (i = 0; i < offset_max; i++)
+		count += __builtin_popcountl(set->bits[i]);
+
+	return count;
 }

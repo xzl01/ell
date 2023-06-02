@@ -32,9 +32,9 @@
 #include "hashmap.h"
 #include "queue.h"
 #include "io.h"
+#include "private.h"
 #include "netlink-private.h"
 #include "netlink.h"
-#include "private.h"
 
 struct command {
 	unsigned int id;
@@ -158,6 +158,33 @@ static void process_broadcast(struct l_netlink *netlink, uint32_t group,
 	l_hashmap_foreach(notify_list, do_notify, nlmsg);
 }
 
+static void process_ext_ack(struct l_netlink *netlink,
+				const struct nlmsghdr *nlmsg)
+{
+	const char *err_str = NULL;
+	uint32_t err_offset = -1U;
+	_auto_(l_free) char *dbg_str = NULL;
+
+	if (!netlink->debug_handler)
+		return;
+
+	if (!netlink_parse_ext_ack_error(nlmsg, &err_str, &err_offset) ||
+			(!err_str && err_offset == -1U))
+		return;
+
+	if (err_str && err_offset != -1U)
+		dbg_str = l_strdup_printf("Extended error: '%s', offset of "
+					" offending element within request: "
+					"%i bytes", err_str, (int) err_offset);
+	else if (err_str)
+		dbg_str = l_strdup_printf("Extended error: '%s'", err_str);
+	else
+		dbg_str = l_strdup_printf("Offset of offending element within "
+					"request: %i bytes", (int) err_offset);
+
+	netlink->debug_handler(dbg_str, netlink->debug_data);
+}
+
 static void process_message(struct l_netlink *netlink, struct nlmsghdr *nlmsg)
 {
 	const void *data = nlmsg;
@@ -176,10 +203,12 @@ static void process_message(struct l_netlink *netlink, struct nlmsghdr *nlmsg)
 
 		switch (nlmsg->nlmsg_type) {
 		case NLMSG_ERROR:
-			err = data + NLMSG_HDRLEN;
+			err = NLMSG_DATA(nlmsg);
 
 			command->handler(err->error, 0, NULL, 0,
 							command->user_data);
+
+			process_ext_ack(netlink, nlmsg);
 			break;
 		}
 	} else {
@@ -332,28 +361,28 @@ LIB_EXPORT struct l_netlink *l_netlink_new(int protocol)
 {
 	struct l_netlink *netlink;
 	int sk;
+	struct l_io *io;
+	uint32_t pid;
+
+	sk = create_netlink_socket(protocol, &pid);
+	if (sk < 0)
+		return NULL;
+
+	io = l_io_new(sk);
+	if (!io) {
+		close(sk);
+		return NULL;
+	}
 
 	netlink = l_new(struct l_netlink, 1);
 
+	netlink->pid = pid;
 	netlink->next_seq = 1;
 	netlink->next_command_id = 1;
 	netlink->next_notify_id = 1;
 
-	sk = create_netlink_socket(protocol, &netlink->pid);
-	if (sk < 0) {
-		l_free(netlink);
-		return NULL;
-	}
-
-	netlink->io = l_io_new(sk);
-	if (!netlink->io) {
-		close(sk);
-		l_free(netlink);
-		return NULL;
-	}
-
+	netlink->io = io;
 	l_io_set_close_on_destroy(netlink->io, true);
-
 	l_io_set_read_handler(netlink->io, can_read_data, netlink, NULL);
 
 	netlink->command_queue = l_queue_new();
@@ -597,6 +626,8 @@ LIB_EXPORT bool l_netlink_set_debug(struct l_netlink *netlink,
 			l_netlink_debug_func_t function,
 			void *user_data, l_netlink_destroy_func_t destroy)
 {
+	int ext_ack;
+
 	if (unlikely(!netlink))
 		return false;
 
@@ -608,6 +639,66 @@ LIB_EXPORT bool l_netlink_set_debug(struct l_netlink *netlink,
 	netlink->debug_data = user_data;
 
 	/* l_io_set_debug(netlink->io, function, user_data, NULL); */
+
+	ext_ack = function != NULL;
+	if (setsockopt(l_io_get_fd(netlink->io), SOL_NETLINK, NETLINK_EXT_ACK,
+			&ext_ack, sizeof(ext_ack)) < 0 && function)
+		function("Failed to set NETLINK_EXT_ACK", user_data);
+
+	return true;
+}
+
+/*
+ * Parses extended error info from the extended ack.  It is assumed that the
+ * caller has already checked the type of @nlmsg and it is of type NLMSG_ERROR.
+ */
+bool netlink_parse_ext_ack_error(const struct nlmsghdr *nlmsg,
+					const char **out_error_msg,
+					uint32_t *out_error_offset)
+{
+	const struct nlmsgerr *err = NLMSG_DATA(nlmsg);
+	unsigned int offset = 0;
+	struct nlattr *nla;
+	int len;
+
+	if (!(nlmsg->nlmsg_flags & NLM_F_ACK_TLVS))
+		return false;
+
+	/*
+	 * If the message is capped, then err->msg.nlmsg_len contains the
+	 * length of the original message and thus can't be used to
+	 * calculate the offset.
+	 */
+	if (!(nlmsg->nlmsg_flags & NLM_F_CAPPED))
+		offset = err->msg.nlmsg_len - sizeof(struct nlmsghdr);
+
+	/*
+	 * Attributes start past struct nlmsgerr.  The offset is 0 for
+	 * NLM_F_CAPPED messages.  Otherwise the original message is
+	 * included, and thus the offset takes err->msg.nlmsg_len into
+	 * account.
+	 */
+	nla = (void *)(err + 1) + offset;
+
+	/* Calculate bytes taken up by header + nlmsgerr contents */
+	offset += sizeof(struct nlmsghdr) + sizeof(struct nlmsgerr);
+	if (nlmsg->nlmsg_len <= offset)
+		return false;
+
+	len = nlmsg->nlmsg_len - offset;
+
+	for (; NLA_OK(nla, len); nla = NLA_NEXT(nla, len)) {
+		switch (nla->nla_type & NLA_TYPE_MASK) {
+		case NLMSGERR_ATTR_MSG:
+			if (out_error_msg)
+				*out_error_msg = NLA_DATA(nla);
+			break;
+		case NLMSGERR_ATTR_OFFS:
+			if (out_error_offset)
+				*out_error_offset = l_get_u32(NLA_DATA(nla));
+			break;
+		}
+	}
 
 	return true;
 }

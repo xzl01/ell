@@ -36,6 +36,7 @@ struct l_tls;
 struct l_key;
 struct l_certchain;
 struct l_queue;
+struct l_settings;
 
 enum l_tls_alert_desc {
 	TLS_ALERT_CLOSE_NOTIFY		= 0,
@@ -72,6 +73,7 @@ typedef void (*l_tls_disconnect_cb_t)(enum l_tls_alert_desc reason,
 					bool remote, void *user_data);
 typedef void (*l_tls_debug_cb_t)(const char *str, void *user_data);
 typedef void (*l_tls_destroy_cb_t)(void *user_data);
+typedef void (*l_tls_session_update_cb_t)(void *user_data);
 
 /*
  * app_data_handler gets called with newly received decrypted data.
@@ -91,6 +93,9 @@ bool l_tls_start(struct l_tls *tls);
 
 /* Properly disconnect a connected session */
 void l_tls_close(struct l_tls *tls);
+
+/* Reset to initial state without a graceful disconnect or callback */
+void l_tls_reset(struct l_tls *tls);
 
 /* Submit plaintext data to be encrypted and transmitted */
 void l_tls_write(struct l_tls *tls, const uint8_t *data, size_t len);
@@ -123,6 +128,13 @@ void l_tls_set_version_range(struct l_tls *tls,
 				enum l_tls_version max_version);
 
 void l_tls_set_domain_mask(struct l_tls *tls, char **mask);
+
+void l_tls_set_session_cache(struct l_tls *tls, struct l_settings *settings,
+				const char *group_prefix, uint64_t lifetime,
+				unsigned int max_sessions,
+				l_tls_session_update_cb_t update_cb,
+				void *user_data);
+bool l_tls_get_session_resumed(struct l_tls *tls);
 
 const char *l_tls_alert_to_str(enum l_tls_alert_desc desc);
 

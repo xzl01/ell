@@ -43,14 +43,20 @@
 #include "netlink.h"
 #include "rtnl.h"
 #include "acd.h"
+#include "log.h"
 
+#define CLIENT_LOG(priority, fmt, args...)				\
+	if (priority <= client->debug_level)				\
+		l_util_debug(client->debug_handler, client->debug_data,	\
+				"%s:%i " fmt, __func__, __LINE__, ## args)
 #define CLIENT_DEBUG(fmt, args...)					\
-	l_util_debug(client->debug_handler, client->debug_data,		\
-			"%s:%i " fmt, __func__, __LINE__, ## args)
+	CLIENT_LOG(L_LOG_DEBUG, fmt, ## args)
+#define CLIENT_INFO(fmt, args...)					\
+	CLIENT_LOG(L_LOG_INFO, fmt, ## args)
+#define CLIENT_WARN(fmt, args...)					\
+	CLIENT_LOG(L_LOG_WARNING, fmt, ## args)
 #define CLIENT_ENTER_STATE(s)						\
-	l_util_debug(client->debug_handler, client->debug_data,		\
-			"%s:%i Entering state: " #s,			\
-			__func__, __LINE__);				\
+	CLIENT_INFO("Entering state: " #s);				\
 	client->state = (s)
 
 #define BITS_PER_LONG (sizeof(unsigned long) * 8)
@@ -149,25 +155,6 @@ static void dhcp_message_set_address_type(struct dhcp_message *message,
 	}
 }
 
-static inline int dhcp_message_optimize(struct dhcp_message *message,
-					const uint8_t *end)
-{
-	/*
-	 * Don't bother sending a full sized dhcp_message as it is most likely
-	 * mostly zeros.  Instead truncate it at DHCP_OPTION_END and align to
-	 * the nearest 4 byte boundary.  Many implementations expect a packet
-	 * of a certain size or it is filtered, so we cap the length in
-	 * accordance to RFC 1542:
-	 * "The IP Total Length and UDP Length must be large enough to contain
-	 * the minimal BOOTP header of 300 octets"
-	 */
-	size_t len = align_len(end - (uint8_t *) message, 4);
-	if (len < 300)
-		len = 300;
-
-	return len;
-}
-
 struct l_dhcp_client {
 	enum dhcp_state state;
 	unsigned long request_options[256 / BITS_PER_LONG];
@@ -192,6 +179,7 @@ struct l_dhcp_client {
 	l_dhcp_destroy_cb_t event_destroy;
 	l_dhcp_debug_cb_t debug_handler;
 	l_dhcp_destroy_cb_t debug_destroy;
+	int debug_level;
 	struct l_acd *acd;
 	void *debug_data;
 	bool have_addr : 1;
@@ -377,12 +365,27 @@ static int dhcp_client_send_unicast(struct l_dhcp_client *client,
 					unsigned int len)
 {
 	struct sockaddr_in si;
+	int r;
 
 	memset(&si, 0, sizeof(si));
 	si.sin_family = AF_INET;
 	si.sin_port = L_CPU_TO_BE16(DHCP_PORT_SERVER);
 	si.sin_addr.s_addr = client->lease->server_address;
-	return client->transport->send(client->transport, &si, request, len);
+
+	/*
+	 * sendto() might fail with an EPERM error, which most likely means
+	 * that the unicast was prevented by netfilter.  Ignore this case
+	 * and assume that once the REBINDING timeout is hit, a broadcast
+	 * will go through which will have a chance of renewing the lease
+	 */
+	r = client->transport->send(client->transport, &si, request, len);
+	if (r == -EPERM) {
+		CLIENT_DEBUG("transport->send() failed with EPERM -> ignore");
+		CLIENT_DEBUG("Is a firewall denying unicast DHCP packets?");
+		return 0;
+	}
+
+	return r;
 }
 
 static int dhcp_client_send_request(struct l_dhcp_client *client)
@@ -425,14 +428,14 @@ static int dhcp_client_send_request(struct l_dhcp_client *client)
 		if (!_dhcp_message_builder_append(&builder,
 					L_DHCP_OPTION_SERVER_IDENTIFIER,
 					4, &client->lease->server_address)) {
-			CLIENT_DEBUG("Failed to append server ID");
+			CLIENT_WARN("Failed to append server ID");
 			return -EINVAL;
 		}
 
 		if (!_dhcp_message_builder_append(&builder,
 					L_DHCP_OPTION_REQUESTED_IP_ADDRESS,
 					4, &client->lease->address)) {
-			CLIENT_DEBUG("Failed to append requested IP");
+			CLIENT_WARN("Failed to append requested IP");
 			return -EINVAL;
 		}
 
@@ -455,7 +458,7 @@ static int dhcp_client_send_request(struct l_dhcp_client *client)
 						L_DHCP_OPTION_HOST_NAME,
 						strlen(client->hostname),
 						client->hostname)) {
-			CLIENT_DEBUG("Failed to append host name");
+			CLIENT_WARN("Failed to append host name");
 			return -EINVAL;
 		}
 	}
@@ -507,7 +510,7 @@ static void dhcp_client_send_release(struct l_dhcp_client *client)
 	if (!_dhcp_message_builder_append(&builder,
 					L_DHCP_OPTION_SERVER_IDENTIFIER,
 					4, &client->lease->server_address)) {
-		CLIENT_DEBUG("Failed to append server ID");
+		CLIENT_WARN("Failed to append server ID");
 		return;
 	}
 
@@ -520,6 +523,7 @@ static void dhcp_client_timeout_resend(struct l_timeout *timeout,
 								void *user_data)
 {
 	struct l_dhcp_client *client = user_data;
+	struct l_dhcp_lease *lease = client->lease;
 	unsigned int next_timeout = 0;
 	int r;
 
@@ -529,7 +533,7 @@ static void dhcp_client_timeout_resend(struct l_timeout *timeout,
 	case DHCP_STATE_SELECTING:
 		r = dhcp_client_send_discover(client);
 		if (r < 0) {
-			CLIENT_DEBUG("Sending discover failed: %s",
+			CLIENT_WARN("Sending discover failed: %s",
 								strerror(-r));
 			goto error;
 		}
@@ -540,7 +544,7 @@ static void dhcp_client_timeout_resend(struct l_timeout *timeout,
 	case DHCP_STATE_REBINDING:
 		r = dhcp_client_send_request(client);
 		if (r < 0) {
-			CLIENT_DEBUG("Sending Request failed: %s",
+			CLIENT_WARN("Sending Request failed: %s",
 								strerror(-r));
 			goto error;
 		}
@@ -555,12 +559,12 @@ static void dhcp_client_timeout_resend(struct l_timeout *timeout,
 
 	switch (client->state) {
 	case DHCP_STATE_RENEWING:
-		next_timeout = dhcp_rebind_renew_retry_time(client->start_t,
-							client->lease->t2);
+		next_timeout = dhcp_rebind_renew_retry_time(lease->bound_time,
+								lease->t2);
 		break;
 	case DHCP_STATE_REBINDING:
-		next_timeout = dhcp_rebind_renew_retry_time(client->start_t,
-						client->lease->lifetime);
+		next_timeout = dhcp_rebind_renew_retry_time(lease->bound_time,
+							lease->lifetime);
 		break;
 	case DHCP_STATE_REQUESTING:
 	case DHCP_STATE_SELECTING:
@@ -632,7 +636,7 @@ static void dhcp_client_t1_expired(struct l_timeout *timeout, void *user_data)
 
 	r = dhcp_client_send_request(client);
 	if  (r < 0) {
-		CLIENT_DEBUG("Sending request failed: %s", strerror(-r));
+		CLIENT_WARN("Sending request failed: %s", strerror(-r));
 		goto error;
 	}
 
@@ -642,7 +646,7 @@ static void dhcp_client_t1_expired(struct l_timeout *timeout, void *user_data)
 	l_timeout_set_callback(client->timeout_lease, dhcp_client_t2_expired,
 				client, NULL);
 
-	next_timeout = dhcp_rebind_renew_retry_time(client->start_t,
+	next_timeout = dhcp_rebind_renew_retry_time(client->lease->bound_time,
 							client->lease->t2);
 	client->timeout_resend =
 		l_timeout_create_ms(dhcp_fuzz_secs(next_timeout),
@@ -665,7 +669,7 @@ static void dhcp_client_address_add_cb(int error, uint16_t type,
 	if (error < 0 && error != -EEXIST) {
 		l_rtnl_address_free(client->rtnl_configured_address);
 		client->rtnl_configured_address = NULL;
-		CLIENT_DEBUG("Unable to set address on ifindex: %u: %d(%s)",
+		CLIENT_WARN("Unable to set address on ifindex: %u: %d(%s)",
 				client->ifindex, error,
 				strerror(-error));
 		return;
@@ -675,7 +679,7 @@ static void dhcp_client_address_add_cb(int error, uint16_t type,
 static int dhcp_client_receive_ack(struct l_dhcp_client *client,
 					const uint8_t *saddr,
 					const struct dhcp_message *ack,
-					size_t len)
+					size_t len, uint64_t timestamp)
 {
 	struct dhcp_message_iter iter;
 	struct l_dhcp_lease *lease;
@@ -691,7 +695,7 @@ static int dhcp_client_receive_ack(struct l_dhcp_client *client,
 
 	lease = _dhcp_lease_parse_options(&iter);
 	if (!lease) {
-		CLIENT_DEBUG("Failed to parse DHCP options.");
+		CLIENT_WARN("Failed to parse DHCP options.");
 
 		return -ENOMSG;
 	}
@@ -727,6 +731,7 @@ static int dhcp_client_receive_ack(struct l_dhcp_client *client,
 		uint32_t l = l_dhcp_lease_get_lifetime(client->lease);
 		L_AUTO_FREE_VAR(char *, broadcast) =
 				l_dhcp_lease_get_broadcast(client->lease);
+		uint64_t et = timestamp + l * L_USEC_PER_SEC;
 
 		prefix_len = l_dhcp_lease_get_prefix_length(client->lease);
 		if (!prefix_len)
@@ -735,6 +740,7 @@ static int dhcp_client_receive_ack(struct l_dhcp_client *client,
 		a = l_rtnl_address_new(ip, prefix_len);
 		l_rtnl_address_set_noprefixroute(a, true);
 		l_rtnl_address_set_lifetimes(a, l, l);
+		l_rtnl_address_set_expiry(a, et, et);
 		l_rtnl_address_set_broadcast(a, broadcast);
 
 		client->rtnl_add_cmdid =
@@ -744,7 +750,7 @@ static int dhcp_client_receive_ack(struct l_dhcp_client *client,
 		if (client->rtnl_add_cmdid)
 			client->rtnl_configured_address = a;
 		else {
-			CLIENT_DEBUG("Configuring address via RTNL failed");
+			CLIENT_WARN("Configuring address via RTNL failed");
 			l_rtnl_address_free(a);
 		}
 	}
@@ -757,6 +763,7 @@ static int dhcp_client_receive_offer(struct l_dhcp_client *client,
 					size_t len)
 {
 	struct dhcp_message_iter iter;
+	struct l_dhcp_lease *lease;
 
 	CLIENT_DEBUG("");
 
@@ -766,17 +773,58 @@ static int dhcp_client_receive_offer(struct l_dhcp_client *client,
 	if (!_dhcp_message_iter_init(&iter, offer, len))
 		return -EINVAL;
 
-	client->lease = _dhcp_lease_parse_options(&iter);
-	if (!client->lease)
+	lease = _dhcp_lease_parse_options(&iter);
+	if (!lease)
 		return -ENOMSG;
+
+	/*
+	 * Received another offer. In the case of multiple DHCP servers we want
+	 * to ignore it and continue using the first offer. If this is from the
+	 * same server its likely a buggy DHCP implementation and we should
+	 * use the last offer it sends.
+	 */
+	if (client->lease) {
+		if (client->lease->server_address != lease->server_address) {
+			_dhcp_lease_free(lease);
+			return -ENOMSG;
+		}
+
+		CLIENT_INFO("Server sent another offer, using it instead");
+
+		_dhcp_lease_free(client->lease);
+	}
+
+	client->lease = lease;
 
 	client->lease->address = offer->yiaddr;
 
 	return 0;
 }
 
+static bool dhcp_client_handle_offer(struct l_dhcp_client *client,
+					const struct dhcp_message *message,
+					size_t len)
+{
+	if (dhcp_client_receive_offer(client, message, len) < 0)
+		return false;
+
+	CLIENT_ENTER_STATE(DHCP_STATE_REQUESTING);
+	client->attempt = 1;
+
+	if (dhcp_client_send_request(client) < 0) {
+		l_dhcp_client_stop(client);
+
+		return false;
+	}
+
+	l_timeout_modify_ms(client->timeout_resend, dhcp_fuzz_secs(4));
+
+	return true;
+}
+
 static void dhcp_client_rx_message(const void *data, size_t len, void *userdata,
-					const uint8_t *saddr)
+					const uint8_t *saddr,
+					uint64_t timestamp)
 {
 	struct l_dhcp_client *client = userdata;
 	const struct dhcp_message *message = data;
@@ -787,6 +835,7 @@ static void dhcp_client_rx_message(const void *data, size_t len, void *userdata,
 	const void *v;
 	int r, e;
 	struct in_addr ia;
+	enum l_dhcp_client_event event = L_DHCP_CLIENT_EVENT_LEASE_EXPIRED;
 
 	CLIENT_DEBUG("");
 
@@ -832,56 +881,52 @@ static void dhcp_client_rx_message(const void *data, size_t len, void *userdata,
 		if (msg_type != DHCP_MESSAGE_TYPE_OFFER)
 			return;
 
-		if (dhcp_client_receive_offer(client, message, len) < 0)
+		if (!dhcp_client_handle_offer(client, message, len))
 			return;
 
-		CLIENT_ENTER_STATE(DHCP_STATE_REQUESTING);
-		client->attempt = 1;
-
-		if (dhcp_client_send_request(client) < 0) {
-			l_dhcp_client_stop(client);
-
+		break;
+	case DHCP_STATE_REQUESTING:
+		if (msg_type == DHCP_MESSAGE_TYPE_OFFER) {
+			dhcp_client_handle_offer(client, message, len);
 			return;
 		}
 
-		l_timeout_modify_ms(client->timeout_resend, dhcp_fuzz_secs(4));
-		break;
-	case DHCP_STATE_REQUESTING:
+		event = L_DHCP_CLIENT_EVENT_NO_LEASE;
+		/* Fall through */
 	case DHCP_STATE_RENEWING:
 	case DHCP_STATE_REBINDING:
 	receive_rapid_commit:
 		if (msg_type == DHCP_MESSAGE_TYPE_NAK) {
-			CLIENT_DEBUG("Received NAK, Stopping...");
+			CLIENT_INFO("Received NAK, Stopping...");
 			l_dhcp_client_stop(client);
 
-			dhcp_client_event_notify(client,
-					L_DHCP_CLIENT_EVENT_NO_LEASE);
+			dhcp_client_event_notify(client, event);
 			return;
 		}
 
 		if (msg_type != DHCP_MESSAGE_TYPE_ACK)
 			return;
 
-		r = dhcp_client_receive_ack(client, saddr, message, len);
+		r = dhcp_client_receive_ack(client, saddr, message, len,
+						timestamp);
 		if (r < 0)
 			return;
 
 		CLIENT_ENTER_STATE(DHCP_STATE_BOUND);
 		l_timeout_remove(client->timeout_resend);
 		client->timeout_resend = NULL;
+		client->lease->bound_time = timestamp;
 
 		if (client->transport->bind) {
 			e = client->transport->bind(client->transport,
 						client->lease->address);
 			if (e < 0) {
-				CLIENT_DEBUG("Failed to bind dhcp socket. "
+				CLIENT_WARN("Failed to bind dhcp socket. "
 					"Error %d: %s", e, strerror(-e));
 			}
 		}
 
 		dhcp_client_event_notify(client, r);
-
-		client->lease->bound_time = l_time_now();
 
 		/*
 		 * Start T1, once it expires we will start the T2 timer.  If
@@ -900,7 +945,7 @@ static void dhcp_client_rx_message(const void *data, size_t len, void *userdata,
 			uint32_t next_timeout =
 					dhcp_fuzz_secs(client->lease->t1);
 
-			CLIENT_DEBUG("T1 expiring in %u ms", next_timeout);
+			CLIENT_INFO("T1 expiring in %u ms", next_timeout);
 			client->timeout_lease =
 				l_timeout_create_ms(next_timeout,
 							dhcp_client_t1_expired,
@@ -913,7 +958,7 @@ static void dhcp_client_rx_message(const void *data, size_t len, void *userdata,
 
 		client->acd = l_acd_new(client->ifindex);
 
-		if (client->debug_handler)
+		if (client->debug_handler && client->debug_level == L_LOG_DEBUG)
 			l_acd_set_debug(client->acd, client->debug_handler,
 					client->debug_data,
 					client->debug_destroy);
@@ -936,7 +981,7 @@ static void dhcp_client_rx_message(const void *data, size_t len, void *userdata,
 
 		/* For unit testing we don't want this to be a fatal error */
 		if (!l_acd_start(client->acd, buf)) {
-			CLIENT_DEBUG("Failed to start ACD on %s, continuing",
+			CLIENT_WARN("Failed to start ACD on %s, continuing",
 						buf);
 			l_acd_destroy(client->acd);
 			client->acd = NULL;
@@ -1250,7 +1295,8 @@ LIB_EXPORT bool l_dhcp_client_set_event_handler(struct l_dhcp_client *client,
 LIB_EXPORT bool l_dhcp_client_set_debug(struct l_dhcp_client *client,
 						l_dhcp_debug_cb_t function,
 						void *user_data,
-						l_dhcp_destroy_cb_t destroy)
+						l_dhcp_destroy_cb_t destroy,
+						int priority)
 {
 	if (unlikely(!client))
 		return false;
@@ -1261,6 +1307,7 @@ LIB_EXPORT bool l_dhcp_client_set_debug(struct l_dhcp_client *client,
 	client->debug_handler = function;
 	client->debug_destroy = destroy;
 	client->debug_data = user_data;
+	client->debug_level = priority;
 
 	return true;
 }

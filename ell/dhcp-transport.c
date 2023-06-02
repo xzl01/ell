@@ -40,10 +40,13 @@
 #include <linux/filter.h>
 #include <net/if_arp.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "io.h"
 #include "util.h"
 #include "private.h"
+#include "time.h"
+#include "time-private.h"
 #include "dhcp-private.h"
 
 struct dhcp_default_transport {
@@ -112,10 +115,20 @@ static bool _dhcp_default_transport_read_handler(struct l_io *io,
 	struct dhcp_packet *p;
 	uint16_t c;
 	struct sockaddr_ll saddr;
-	socklen_t saddr_len = sizeof(saddr);
+	uint64_t timestamp = 0;
+	struct cmsghdr *cmsg;
+	struct iovec iov = { .iov_base = buf, .iov_len = sizeof(buf) };
+	struct msghdr msg = {};
+	unsigned char control[32 + CMSG_SPACE(sizeof(struct timeval))];
 
-	len = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr *) &saddr,
-			&saddr_len);
+	msg.msg_name = &saddr;
+	msg.msg_namelen = sizeof(saddr);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = control;
+	msg.msg_controllen = sizeof(control);
+
+	len = recvmsg(fd, &msg, 0);
 	if (len < 0)
 		return false;
 
@@ -151,14 +164,30 @@ static bool _dhcp_default_transport_read_handler(struct l_io *io,
 
 	len -= sizeof(struct udphdr) - sizeof(struct iphdr);
 
+	for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL;
+					cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+		if (cmsg->cmsg_level == SOL_SOCKET &&
+				cmsg->cmsg_type == SCM_TIMESTAMP &&
+				cmsg->cmsg_len ==
+				CMSG_LEN(sizeof(struct timeval))) {
+			const struct timeval *tv = (void *) CMSG_DATA(cmsg);
+
+			timestamp = _time_realtime_to_boottime(tv);
+		}
+	}
+
+	if (!timestamp)
+		timestamp = l_time_now();
+
 	if (transport->super.rx_cb) {
 		const uint8_t *src_mac = NULL;
 
-		if (saddr_len >= sizeof(saddr) && saddr.sll_halen == ETH_ALEN)
+		if (msg.msg_namelen >= sizeof(saddr) &&
+				saddr.sll_halen == ETH_ALEN)
 			src_mac = saddr.sll_addr;
 
 		transport->super.rx_cb(&p->dhcp, len, transport->super.rx_data,
-					src_mac);
+					src_mac, timestamp);
 	}
 
 	return true;
@@ -334,6 +363,9 @@ static int _dhcp_default_transport_bind(struct dhcp_transport *s,
 	if (!transport->io)
 		return -EIO;
 
+	if (transport->udp_fd >= 0)
+		return 0;
+
 	fd = kernel_udp_socket_open(transport->ifname, saddr, transport->port);
 	if (fd < 0)
 		return fd;
@@ -357,18 +389,8 @@ static int kernel_raw_socket_open(uint32_t ifindex, uint16_t port, uint32_t xid)
 		BPF_STMT(BPF_RET + BPF_K, 0),
 		/* A <- IP version + Header length */
 		BPF_STMT(BPF_LD + BPF_B + BPF_ABS, 0),
-		/* A <- A & 0xf0 (Mask off version */
-		BPF_STMT(BPF_ALU + BPF_AND + BPF_K, 0xf0),
-		/* A == IPVERSION (shifted left 4) ? */
-		BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, IPVERSION << 4, 1, 0),
-		/* ignore */
-		BPF_STMT(BPF_RET + BPF_K, 0),
-		/* A <- IP version + Header length */
-		BPF_STMT(BPF_LD + BPF_B + BPF_ABS, 0),
-		/* A <- A & 0x0f (Mask off IP Header Length */
-		BPF_STMT(BPF_ALU + BPF_AND + BPF_K, 0x0f),
-		/* A == 5 ? */
-		BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, 5, 1, 0),
+		/* IP version == IPVERSION && Header length == 5 ? */
+		BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, (IPVERSION << 4) | 5, 1, 0),
 		/* ignore */
 		BPF_STMT(BPF_RET + BPF_K, 0),
 		/* A <- IP protocol */
@@ -443,6 +465,7 @@ static int kernel_raw_socket_open(uint32_t ifindex, uint16_t port, uint32_t xid)
 		.len = L_ARRAY_SIZE(filter),
 		.filter = filter
 	};
+	int one = 1;
 
 	s = socket(AF_PACKET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 	if (s < 0)
@@ -450,6 +473,9 @@ static int kernel_raw_socket_open(uint32_t ifindex, uint16_t port, uint32_t xid)
 
 	if (setsockopt(s, SOL_SOCKET, SO_ATTACH_FILTER,
 						&fprog, sizeof(fprog)) < 0)
+		goto error;
+
+	if (setsockopt(s, SOL_SOCKET, SO_TIMESTAMP, &one, sizeof(one)) < 0)
 		goto error;
 
 	memset(&addr, 0, sizeof(addr));
@@ -483,6 +509,11 @@ static int _dhcp_default_transport_open(struct dhcp_transport *s, uint32_t xid)
 		return fd;
 
 	transport->io = l_io_new(fd);
+	if (!transport->io) {
+		close(fd);
+		return -EMFILE;
+	}
+
 	l_io_set_close_on_destroy(transport->io, true);
 	l_io_set_read_handler(transport->io,
 					_dhcp_default_transport_read_handler,
@@ -521,6 +552,7 @@ struct dhcp_transport *_dhcp_default_transport_new(uint32_t ifindex,
 	transport->super.ifindex = ifindex;
 	l_strlcpy(transport->ifname, ifname, IFNAMSIZ);
 	transport->port = port;
+	transport->udp_fd = -1;
 
 	return &transport->super;
 }

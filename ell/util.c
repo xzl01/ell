@@ -376,6 +376,36 @@ static char *hexstring_common(const unsigned char *buf, size_t len,
 	return str;
 }
 
+static char *hexstringv_common(const struct iovec *iov, size_t n_iov,
+				const char hexdigits[static 16])
+{
+	char *str;
+	size_t i, j, c;
+	size_t len;
+
+	if (unlikely(!iov || !n_iov))
+		return NULL;
+
+	for (i = 0, len = 0; i < n_iov; i++)
+		len += iov[i].iov_len;
+
+	str = l_malloc(len * 2 + 1);
+	c = 0;
+
+	for (i = 0; i < n_iov; i++) {
+		const uint8_t *buf = iov[i].iov_base;
+
+		for (j = 0; j < iov[i].iov_len; j++) {
+			str[c++] = hexdigits[buf[j] >> 4];
+			str[c++] = hexdigits[buf[j] & 0xf];
+		}
+	}
+
+	str[len * 2] = '\0';
+
+	return str;
+}
+
 /**
  * l_util_hexstring:
  * @buf: buffer pointer
@@ -404,6 +434,36 @@ LIB_EXPORT char *l_util_hexstring_upper(const void *buf, size_t len)
 {
 	static const char hexdigits[] = "0123456789ABCDEF";
 	return hexstring_common(buf, len, hexdigits);
+}
+
+/**
+ * l_util_hexstringv:
+ * @iov: iovec
+ * @n_iov: length of the iovec
+ *
+ * Returns: a newly allocated hex string.  Note that the string will contain
+ * lower case hex digits a-f.  If you require upper case hex digits, use
+ * @l_util_hexstringv_upper
+ **/
+LIB_EXPORT char *l_util_hexstringv(const struct iovec *iov, size_t n_iov)
+{
+	static const char hexdigits[] = "0123456789abcdef";
+	return hexstringv_common(iov, n_iov, hexdigits);
+}
+
+/**
+ * l_util_hexstringv_upper:
+ * @iov: iovec
+ * @n_iov: length of the iovec
+ *
+ * Returns: a newly allocated hex string.  Note that the string will contain
+ * upper case hex digits a-f.  If you require lower case hex digits, use
+ * @l_util_hexstringv
+ **/
+LIB_EXPORT char *l_util_hexstringv_upper(const struct iovec *iov, size_t n_iov)
+{
+	static const char hexdigits[] = "0123456789ABCDEF";
+	return hexstringv_common(iov, n_iov, hexdigits);
 }
 
 /**

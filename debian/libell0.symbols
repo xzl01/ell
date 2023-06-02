@@ -22,6 +22,7 @@ libell.so.0 libell0 #MINVER#
  l_cert_get_dn@ELL_0.10 0.16
  l_cert_get_pubkey@ELL_0.10 0.16
  l_cert_get_pubkey_type@ELL_0.10 0.16
+ l_cert_get_valid_times@ELL_0.10 0.54
  l_cert_load_container_file@ELL_0.10 0.40
  l_cert_new_from_der@ELL_0.10 0.16
  l_cert_pkcs5_pbkdf1@ELL_0.10 0.40
@@ -158,7 +159,10 @@ libell.so.0 libell0 #MINVER#
  l_dhcp6_lease_get_address@ELL_0.10 0.35
  l_dhcp6_lease_get_dns@ELL_0.10 0.35
  l_dhcp6_lease_get_domains@ELL_0.10 0.35
+ l_dhcp6_lease_get_preferred_lifetime@ELL_0.10 0.50
+ l_dhcp6_lease_get_start_time@ELL_0.10 0.50
  l_dhcp6_lease_get_prefix_length@ELL_0.10 0.35
+ l_dhcp6_lease_get_valid_lifetime@ELL_0.10 0.50
  l_dhcp_client_add_request_option@ELL_0.10 0.15
  l_dhcp_client_destroy@ELL_0.10 0.15
  l_dhcp_client_get_lease@ELL_0.10 0.15
@@ -185,6 +189,7 @@ libell.so.0 libell0 #MINVER#
  l_dhcp_lease_get_prefix_length@ELL_0.10 0.45
  l_dhcp_lease_get_server_id@ELL_0.10 0.15
  l_dhcp_lease_get_server_mac@ELL_0.10 0.45
+ l_dhcp_lease_get_start_time@ELL_0.10 0.50
  l_dhcp_lease_get_t1@ELL_0.10 0.15
  l_dhcp_lease_get_t2@ELL_0.10 0.15
  l_dhcp_server_decline@ELL_0.10 0.43
@@ -231,6 +236,7 @@ libell.so.0 libell0 #MINVER#
  l_ecc_point_inverse@ELL_0.10 0.17
  l_ecc_point_multiply@ELL_0.10 0.17
  l_ecc_point_new@ELL_0.10 0.17
+ l_ecc_point_y_isodd@ELL_0.10 0.48
  l_ecc_points_are_equal@ELL_0.10 0.17
  l_ecc_scalar_add@ELL_0.10 0.17
  l_ecc_scalar_free@ELL_0.10 0.17
@@ -269,6 +275,7 @@ libell.so.0 libell0 #MINVER#
  l_genl_family_info_has_group@ELL_0.10 0.20
  l_genl_family_new@ELL_0.10 0.15
  l_genl_family_register@ELL_0.10 0.15
+ l_genl_family_request_sent@ELL_0.10 0.47
  l_genl_family_send@ELL_0.10 0.15
  l_genl_family_unregister@ELL_0.10 0.15
  l_genl_msg_append_attr@ELL_0.10 0.15
@@ -333,20 +340,23 @@ libell.so.0 libell0 #MINVER#
  l_hwdb_new_default@ELL_0.10 0.15
  l_hwdb_ref@ELL_0.10 0.15
  l_hwdb_unref@ELL_0.10 0.15
+ l_icmp6_client_add_event_handler@ELL_0.10 0.48
  l_icmp6_client_free@ELL_0.10 0.35
  l_icmp6_client_get_router@ELL_0.10 0.35
  l_icmp6_client_new@ELL_0.10 0.35
  l_icmp6_client_set_address@ELL_0.10 0.35
  l_icmp6_client_set_debug@ELL_0.10 0.35
- l_icmp6_client_set_event_handler@ELL_0.10 0.35
+ l_icmp6_client_set_link_local_address@ELL_0.10 0.54
  l_icmp6_client_set_nodelay@ELL_0.10 0.35
  l_icmp6_client_set_route_priority@ELL_0.10 0.35
  l_icmp6_client_set_rtnl@ELL_0.10 0.35
  l_icmp6_client_start@ELL_0.10 0.35
  l_icmp6_client_stop@ELL_0.10 0.35
  l_icmp6_router_get_address@ELL_0.10 0.43
+ l_icmp6_router_get_lifetime@ELL_0.10 0.50
  l_icmp6_router_get_managed@ELL_0.10 0.35
  l_icmp6_router_get_other@ELL_0.10 0.35
+ l_icmp6_router_get_start_time@ELL_0.10 0.50
  l_idle_create@ELL_0.10 0.15
  l_idle_oneshot@ELL_0.10 0.15
  l_idle_remove@ELL_0.10 0.15
@@ -406,6 +416,31 @@ libell.so.0 libell0 #MINVER#
  l_net_get_name@ELL_0.10 0.15
  l_net_hostname_is_localhost@ELL_0.10 0.27
  l_net_hostname_is_root@ELL_0.10 0.27
+ l_netconfig_apply_rtnl@ELL_0.10 0.50
+ l_netconfig_check_config@ELL_0.10 0.51
+ l_netconfig_destroy@ELL_0.10 0.50
+ l_netconfig_get_addresses@ELL_0.10 0.50
+ l_netconfig_get_dhcp6_client@ELL_0.10 0.51
+ l_netconfig_get_dhcp_client@ELL_0.10 0.50
+ l_netconfig_get_dns_list@ELL_0.10 0.52
+ l_netconfig_get_domain_names@ELL_0.10 0.52
+ l_netconfig_get_icmp6_client@ELL_0.10 0.51
+ l_netconfig_get_routes@ELL_0.10 0.50
+ l_netconfig_new@ELL_0.10 0.50
+ l_netconfig_reset_config@ELL_0.10 0.52
+ l_netconfig_set_acd_enabled@ELL_0.10 0.53
+ l_netconfig_set_dns_override@ELL_0.10 0.51
+ l_netconfig_set_domain_names_override@ELL_0.10 0.51
+ l_netconfig_set_event_handler@ELL_0.10 0.50
+ l_netconfig_set_family_enabled@ELL_0.10 0.51
+ l_netconfig_set_gateway_override@ELL_0.10 0.51
+ l_netconfig_set_hostname@ELL_0.10 0.51
+ l_netconfig_set_optimistic_dad_enabled@ELL_0.10 0.54
+ l_netconfig_set_route_priority@ELL_0.10 0.51
+ l_netconfig_set_static_addr@ELL_0.10 0.51
+ l_netconfig_start@ELL_0.10 0.50
+ l_netconfig_stop@ELL_0.10 0.50
+ l_netconfig_unconfigure@ELL_0.10 0.53
  l_netlink_cancel@ELL_0.10 0.15
  l_netlink_destroy@ELL_0.10 0.15
  l_netlink_new@ELL_0.10 0.15
@@ -462,17 +497,21 @@ libell.so.0 libell0 #MINVER#
  l_rtnl_address_free@ELL_0.10 0.35
  l_rtnl_address_get_address@ELL_0.10 0.35
  l_rtnl_address_get_broadcast@ELL_0.10 0.35
+ l_rtnl_address_get_expiry@ELL_0.10 0.50
  l_rtnl_address_get_family@ELL_0.10 0.35
+ l_rtnl_address_get_in_addr@ELL_0.10 0.54
  l_rtnl_address_get_label@ELL_0.10 0.35
  l_rtnl_address_get_preferred_lifetime@ELL_0.10 0.35
  l_rtnl_address_get_prefix_length@ELL_0.10 0.35
  l_rtnl_address_get_valid_lifetime@ELL_0.10 0.35
  l_rtnl_address_new@ELL_0.10 0.35
  l_rtnl_address_set_broadcast@ELL_0.10 0.35
+ l_rtnl_address_set_expiry@ELL_0.10 0.50
  l_rtnl_address_set_label@ELL_0.10 0.35
  l_rtnl_address_set_lifetimes@ELL_0.10 0.35
  l_rtnl_address_set_noprefixroute@ELL_0.10 0.35
  l_rtnl_address_set_scope@ELL_0.10 0.35
+ l_rtnl_get@ELL_0.10 0.52
  l_rtnl_ifaddr4_add@ELL_0.10 0.31
  l_rtnl_ifaddr4_delete@ELL_0.10 0.31
  l_rtnl_ifaddr4_dump@ELL_0.10 0.31
@@ -497,8 +536,12 @@ libell.so.0 libell0 #MINVER#
  l_rtnl_route_add@ELL_0.10 0.35
  l_rtnl_route_delete@ELL_0.10 0.35
  l_rtnl_route_free@ELL_0.10 0.35
+ l_rtnl_route_get_dst@ELL_0.10 0.49
+ l_rtnl_route_get_dst_in_addr@ELL_0.10 0.50
+ l_rtnl_route_get_expiry@ELL_0.10 0.50
  l_rtnl_route_get_family@ELL_0.10 0.35
  l_rtnl_route_get_gateway@ELL_0.10 0.43
+ l_rtnl_route_get_gateway_in_addr@ELL_0.10 0.50
  l_rtnl_route_get_lifetime@ELL_0.10 0.35
  l_rtnl_route_get_mtu@ELL_0.10 0.35
  l_rtnl_route_get_preference@ELL_0.10 0.35
@@ -508,6 +551,8 @@ libell.so.0 libell0 #MINVER#
  l_rtnl_route_get_scope@ELL_0.10 0.35
  l_rtnl_route_new_gateway@ELL_0.10 0.35
  l_rtnl_route_new_prefix@ELL_0.10 0.35
+ l_rtnl_route_new_static@ELL_0.10 0.50
+ l_rtnl_route_set_expiry@ELL_0.10 0.50
  l_rtnl_route_set_lifetime@ELL_0.10 0.35
  l_rtnl_route_set_mtu@ELL_0.10 0.35
  l_rtnl_route_set_preference@ELL_0.10 0.35
@@ -520,6 +565,7 @@ libell.so.0 libell0 #MINVER#
  l_rtnl_set_powered@ELL_0.10 0.31
  l_secure_memeq@ELL_0.10 0.40
  l_settings_add_group@ELL_0.10 0.40
+ l_settings_clone@ELL_0.10 0.49
  l_settings_free@ELL_0.10 0.15
  l_settings_get_bool@ELL_0.10 0.15
  l_settings_get_bytes@ELL_0.10 0.35
@@ -542,6 +588,7 @@ libell.so.0 libell0 #MINVER#
  l_settings_load_from_data@ELL_0.10 0.15
  l_settings_load_from_file@ELL_0.10 0.15
  l_settings_new@ELL_0.10 0.15
+ l_settings_remove_embedded_groups@ELL_0.10 0.49
  l_settings_remove_group@ELL_0.10 0.15
  l_settings_remove_key@ELL_0.10 0.15
  l_settings_set_bool@ELL_0.10 0.15
@@ -624,14 +671,17 @@ libell.so.0 libell0 #MINVER#
  l_tls_alert_to_str@ELL_0.10 0.15
  l_tls_close@ELL_0.10 0.15
  l_tls_free@ELL_0.10 0.15
+ l_tls_get_session_resumed@ELL_0.10 0.56
  l_tls_handle_rx@ELL_0.10 0.15
  l_tls_new@ELL_0.10 0.15
  l_tls_prf_get_bytes@ELL_0.10 0.15
+ l_tls_reset@ELL_0.10 0.51
  l_tls_set_auth_data@ELL_0.10 0.15
  l_tls_set_cacert@ELL_0.10 0.15
  l_tls_set_cert_dump_path@ELL_0.10 0.36
  l_tls_set_debug@ELL_0.10 0.15
  l_tls_set_domain_mask@ELL_0.10 0.22
+ l_tls_set_session_cache@ELL_0.10 0.54
  l_tls_set_version_range@ELL_0.10 0.19
  l_tls_start@ELL_0.10 0.17
  l_tls_write@ELL_0.10 0.15
@@ -650,6 +700,8 @@ libell.so.0 libell0 #MINVER#
  l_uintset_new@ELL_0.10 0.15
  l_uintset_new_from_range@ELL_0.10 0.15
  l_uintset_put@ELL_0.10 0.15
+ l_uintset_size@ELL_0.10 0.47
+ l_uintset_subtract@ELL_0.10 0.53
  l_uintset_take@ELL_0.10 0.15
  l_utf8_from_ucs2be@ELL_0.10 0.17
  l_utf8_from_utf16@ELL_0.10 0.15
@@ -667,6 +719,8 @@ libell.so.0 libell0 #MINVER#
  l_util_hexdumpv@ELL_0.10 0.15
  l_util_hexstring@ELL_0.10 0.15
  l_util_hexstring_upper@ELL_0.10 0.17
+ l_util_hexstringv@ELL_0.10 0.56
+ l_util_hexstringv_upper@ELL_0.10 0.56
  l_uuid_from_string@ELL_0.10 0.19
  l_uuid_get_version@ELL_0.10 0.15
  l_uuid_is_valid@ELL_0.10 0.15

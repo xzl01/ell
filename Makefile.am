@@ -60,7 +60,8 @@ pkginclude_HEADERS = ell/ell.h \
 			ell/icmp6.h \
 			ell/acd.h \
 			ell/tester.h \
-			ell/cleanup.h
+			ell/cleanup.h \
+			ell/netconfig.h
 
 lib_LTLIBRARIES = ell/libell.la
 
@@ -89,6 +90,7 @@ ell_libell_la_SOURCES = $(linux_headers) \
 			ell/netlink-private.h \
 			ell/netlink.c \
 			ell/genl.c \
+			ell/rtnl-private.h \
 			ell/rtnl.c \
 			ell/dbus-private.h \
 			ell/dbus.c \
@@ -146,7 +148,8 @@ ell_libell_la_SOURCES = $(linux_headers) \
 			ell/icmp6.c \
 			ell/icmp6-private.h \
 			ell/acd.c \
-			ell/tester.c
+			ell/tester.c \
+			ell/netconfig.c
 
 ell_libell_la_LDFLAGS = -Wl,--no-undefined \
 			-Wl,--version-script=$(top_srcdir)/ell/ell.sym \
@@ -216,6 +219,7 @@ cert_tests = unit/test-pem \
 cert_files = unit/cert-chain.pem \
 			unit/cert-entity-int.pem \
 			unit/cert-server.pem \
+			unit/ec-cert-server.pem \
 			unit/cert-server-key-pkcs8.pem \
 			unit/cert-client.pem \
 			unit/cert-client.crt \
@@ -238,11 +242,13 @@ cert_files = unit/cert-chain.pem \
 			unit/cert-entity-pkcs12-rc4-sha384.p12 \
 			unit/cert-entity-pkcs12-pkcs5-sha512.p12 \
 			unit/cert-entity-combined.pem \
-			unit/cert-no-keyid.pem
+			unit/cert-no-keyid.pem \
+			unit/cert-expired.pem
 
 cert_checks = unit/cert-intca \
 			unit/cert-entity-int \
 			unit/cert-server \
+			unit/ec-cert-server \
 			unit/cert-client \
 			unit/cert-no-keyid
 
@@ -345,7 +351,8 @@ unit_test_data_files = unit/settings.test unit/dbus.conf
 examples = examples/dbus-service examples/https-client-test \
 		examples/https-server-test examples/dbus-client \
 		examples/dhcp-client examples/dhcp6-client \
-		examples/dhcp-server examples/acd-client
+		examples/dhcp-server examples/acd-client \
+		examples/netconfig-test
 
 if GLIB
 examples += examples/glib-eventloop
@@ -365,6 +372,7 @@ examples_dhcp_client_LDADD = ell/libell-private.la
 examples_dhcp6_client_LDADD = ell/libell-private.la
 examples_dhcp_server_LDADD = ell/libell-private.la
 examples_acd_client_LDADD = ell/libell-private.la
+examples_netconfig_test_LDADD = ell/libell-private.la
 
 noinst_PROGRAMS += tools/certchain-verify tools/genl-discover \
 		   tools/genl-watch tools/genl-request tools/gpio
@@ -400,13 +408,30 @@ DISTCLEANFILES = $(unit_tests) $(dbus_tests) $(cert_tests)
 
 MAINTAINERCLEANFILES = Makefile.in configure config.h.in aclocal.m4
 
+if OPENSSL_PROVIDER
+openssl_legacy = -provider legacy -provider default
+else
+openssl_legacy =
+endif
+
 true_redirect_openssl = 2>&1
 false_redirect_openssl = 2>/dev/null
 
 unit/cert-ca-key.pem:
 	$(AM_V_GEN)openssl genrsa -out $@ 2048 $($(AM_V_P)_redirect_openssl)
 
+unit/ec-cert-ca-key.pem:
+	$(AM_V_GEN)openssl ecparam -out $@ -name secp384r1 \
+				-genkey $($(AM_V_P)_redirect_openssl)
+
+
 unit/cert-ca.pem: unit/cert-ca-key.pem unit/gencerts.cnf
+	$(AM_V_GEN)openssl req -x509 -new -nodes -extensions ca_ext \
+			-config $(srcdir)/unit/gencerts.cnf \
+			-subj '/O=International Union of Example Organizations/CN=Certificate issuer guy/emailAddress=ca@mail.example' \
+			-key $< -sha256 -days 10000 -out $@
+
+unit/ec-cert-ca.pem: unit/ec-cert-ca-key.pem unit/gencerts.cnf
 	$(AM_V_GEN)openssl req -x509 -new -nodes -extensions ca_ext \
 			-config $(srcdir)/unit/gencerts.cnf \
 			-subj '/O=International Union of Example Organizations/CN=Certificate issuer guy/emailAddress=ca@mail.example' \
@@ -415,10 +440,20 @@ unit/cert-ca.pem: unit/cert-ca-key.pem unit/gencerts.cnf
 unit/cert-server-key.pem:
 	$(AM_V_GEN)openssl genrsa -out $@ $($(AM_V_P)_redirect_openssl)
 
+unit/ec-cert-server-key.pem:
+	$(AM_V_GEN)openssl ecparam -out $@ -name secp384r1 \
+				-genkey $($(AM_V_P)_redirect_openssl)
+
 unit/cert-server-key-pkcs8.pem: unit/cert-server-key.pem
 	$(AM_V_GEN)openssl pkcs8 -topk8 -nocrypt -in $< -out $@
 
 unit/cert-server.csr: unit/cert-server-key.pem unit/gencerts.cnf
+	$(AM_V_GEN)openssl req -new -extensions cert_ext \
+			-config $(srcdir)/unit/gencerts.cnf \
+			-subj '/O=Foo Example Organization/CN=Foo Example Organization/emailAddress=foo@mail.example' \
+			-key $< -out $@
+
+unit/ec-cert-server.csr: unit/ec-cert-server-key.pem unit/gencerts.cnf
 	$(AM_V_GEN)openssl req -new -extensions cert_ext \
 			-config $(srcdir)/unit/gencerts.cnf \
 			-subj '/O=Foo Example Organization/CN=Foo Example Organization/emailAddress=foo@mail.example' \
@@ -432,14 +467,28 @@ unit/cert-server.pem: unit/cert-server.csr unit/cert-ca.pem unit/gencerts.cnf
 			-CAserial $(builddir)/unit/cert-ca.srl \
 			-CAcreateserial -sha256 -days 10000 -out $@ $($(AM_V_P)_redirect_openssl)
 
+unit/ec-cert-server.pem: unit/ec-cert-server.csr unit/ec-cert-ca.pem \
+				unit/gencerts.cnf
+	$(AM_V_GEN)openssl x509 -req -extensions server_ext \
+			-extfile $(srcdir)/unit/gencerts.cnf \
+			-in $< -CA $(builddir)/unit/ec-cert-ca.pem \
+			-CAkey $(builddir)/unit/ec-cert-ca-key.pem \
+			-CAserial $(builddir)/unit/cert-ca.srl \
+			-CAcreateserial -sha256 -days 10000 \
+			-out $@ $($(AM_V_P)_redirect_openssl)
+
 unit/cert-server: unit/cert-server.pem unit/cert-ca.pem
 	$(AM_V_GEN)openssl verify -CAfile $(builddir)/unit/cert-ca.pem $<
+
+unit/ec-cert-server: unit/ec-cert-server.pem unit/ec-cert-ca.pem
+	$(AM_V_GEN)openssl verify -CAfile $(builddir)/unit/ec-cert-ca.pem $<
 
 unit/cert-client-key-pkcs1.pem:
 	$(AM_V_GEN)openssl genrsa -out $@ $($(AM_V_P)_redirect_openssl)
 
 unit/cert-client-key-pkcs1-des.pem: unit/cert-client-key-pkcs1.pem
-	$(AM_V_GEN)openssl rsa -in $< -out $@ -des -passout pass:abc
+	$(AM_V_GEN)openssl rsa -in $< -out $@ -des -passout pass:abc \
+			$(openssl_legacy)
 
 unit/cert-client-key-pkcs1-des3.pem: unit/cert-client-key-pkcs1.pem
 	$(AM_V_GEN)openssl rsa -in $< -out $@ -des3 -passout pass:abc
@@ -458,15 +507,18 @@ unit/cert-client-key-pkcs8.pem: unit/cert-client-key-pkcs1.pem
 
 unit/cert-client-key-pkcs8-md5-des.pem: unit/cert-client-key-pkcs8.pem
 	$(AM_V_GEN)openssl pkcs8 -in $< -out $@ \
-			-topk8 -v1 PBE-MD5-DES -passout pass:abc
+			-topk8 -v1 PBE-MD5-DES -passout pass:abc \
+			$(openssl_legacy)
 
 unit/cert-client-key-pkcs8-sha1-des.pem: unit/cert-client-key-pkcs8.pem
 	$(AM_V_GEN)openssl pkcs8 -in $< -out $@ \
-			-topk8 -v1 PBE-SHA1-DES -passout pass:abc
+			-topk8 -v1 PBE-SHA1-DES -passout pass:abc \
+			$(openssl_legacy)
 
 unit/cert-client-key-pkcs8-v2-des.pem: unit/cert-client-key-pkcs8.pem
 	$(AM_V_GEN)openssl pkcs8 -in $< -out $@ \
-			-topk8 -v2 des-cbc -v2prf hmacWithSHA1 -passout pass:abc
+			-topk8 -v2 des-cbc -v2prf hmacWithSHA1 -passout pass:abc \
+			$(openssl_legacy)
 
 unit/cert-client-key-pkcs8-v2-des-ede3.pem: unit/cert-client-key-pkcs8.pem
 	$(AM_V_GEN)openssl pkcs8 -in $< -out $@ \
@@ -566,23 +618,46 @@ unit/cert-no-keyid.pem: unit/cert-no-keyid.csr unit/cert-ca2.pem unit/gencerts.c
 unit/cert-no-keyid: unit/cert-no-keyid.pem unit/cert-ca2.pem
 	$(AM_V_GEN)openssl verify -CAfile $(builddir)/unit/cert-ca2.pem $<
 
+unit/cert-expired.csr: unit/cert-client-key-pkcs1.pem unit/gencerts.cnf
+	$(AM_V_GEN)openssl req -new -extensions cert_ext \
+			-config $(srcdir)/unit/gencerts.cnf \
+			-subj '/O=Bar Example Organization/CN=Bar Example Organization/emailAddress=bar@mail.example' \
+			-key $< -out $@
+
+unit/cert-ca.cnf:
+	$(AM_V_GEN)echo -e '[example]\ndatabase=unit/cert-ca-index.txt\nserial=unit/cert-ca.srl\npolicy=dummy\n[dummy]' > $@
+
+unit/cert-expired.pem: unit/cert-expired.csr unit/cert-ca.pem unit/gencerts.cnf unit/cert-ca.cnf
+	$(AM_V_at)> unit/cert-ca-index.txt
+	$(AM_V_at)$(MKDIR_P) unit/cert-ca-tmp
+	$(AM_V_GEN)openssl ca -batch \
+			-config $(builddir)/unit/cert-ca.cnf -name example \
+			-cert $(builddir)/unit/cert-ca.pem \
+			-keyfile $(builddir)/unit/cert-ca-key.pem \
+			-outdir $(builddir)/unit/cert-ca-tmp \
+			-rand_serial -extensions cert_ext \
+			-extfile $(srcdir)/unit/gencerts.cnf -md sha256 \
+			-startdate 000101120000Z -enddate 010101120000Z \
+			-preserveDN -notext -in $< -out $@ 2> /dev/null
+	$(AM_V_at)rm -r unit/cert-ca-tmp unit/cert-ca-index.txt
+
 unit/cert-entity-pkcs12-nomac.p12: unit/cert-entity-int-key.pem unit/cert-entity-int.pem
 	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -out $@ -export -passout pass:abc -nomac # defaut ciphers
 
 unit/cert-entity-pkcs12-rc2-sha1.p12: unit/cert-entity-int-key.pem unit/cert-entity-int.pem unit/cert-chain.pem
-	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -certfile $(builddir)/unit/cert-chain.pem -out $@ -export -passout pass:abc -certpbe PBE-SHA1-RC2-40 -keypbe PBE-SHA1-RC2-128 -macalg sha1
+	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -certfile $(builddir)/unit/cert-chain.pem -out $@ -export -passout pass:abc -certpbe PBE-SHA1-RC2-40 -keypbe PBE-SHA1-RC2-128 -macalg sha1 $(openssl_legacy)
 
 unit/cert-entity-pkcs12-des-sha256.p12: unit/cert-entity-int-key.pem unit/cert-entity-int.pem unit/cert-chain.pem
 	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -certfile $(builddir)/unit/cert-chain.pem -out $@ -export -passout pass:abc -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-2DES -macalg sha256
 
 unit/cert-entity-pkcs12-rc4-sha384.p12: unit/cert-entity-int-key.pem unit/cert-entity-int.pem unit/cert-chain.pem
-	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -certfile $(builddir)/unit/cert-chain.pem -out $@ -export -passout pass:abc -certpbe PBE-SHA1-RC4-128 -keypbe PBE-SHA1-RC2-40 -macalg sha384
+	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -certfile $(builddir)/unit/cert-chain.pem -out $@ -export -passout pass:abc -certpbe PBE-SHA1-RC4-128 -keypbe PBE-SHA1-RC2-40 -macalg sha384 $(openssl_legacy)
 
 unit/cert-entity-pkcs12-pkcs5-sha512.p12: unit/cert-entity-int-key.pem unit/cert-entity-int.pem unit/cert-chain.pem
-	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -certfile $(builddir)/unit/cert-chain.pem -out $@ -export -passout pass:abc -certpbe des-cbc -keypbe des-cbc -macalg sha512
+	$(AM_V_GEN)openssl pkcs12 -inkey $< -in $(builddir)/unit/cert-entity-int.pem -certfile $(builddir)/unit/cert-chain.pem -out $@ -export -passout pass:abc -certpbe des-cbc -keypbe des-cbc -macalg sha512 $(openssl_legacy)
 
 unit/cert-entity-combined.pem: unit/cert-entity-pkcs12-rc2-sha1.p12
-	$(AM_V_GEN)openssl pkcs12 -in $< -out $@ -passin pass:abc -passout pass:abc
+	$(AM_V_GEN)openssl pkcs12 -in $< -out $@ -passin pass:abc -passout pass:abc $(openssl_legacy)
 
 unit/key-plaintext.h: unit/plaintext.txt
 	$(AM_V_GEN)xxd -i < $< > $@
@@ -608,7 +683,10 @@ check-local: $(cert_checks)
 endif
 
 clean-local:
-	-rm -f unit/cert-*.pem unit/cert-*.csr unit/cert-*.srl unit/key-*.dat
+	-rm -f unit/ec-cert*.pem unit/ec-cert-*.csr unit/cert-*.crt \
+		unit/cert-*.pem unit/cert-*.csr unit/cert-*.srl \
+		unit/cert-entity-pkcs12-*.p12 unit/key-*.dat \
+		unit/cert-ca-index* unit/cert-ca.cnf
 
 maintainer-clean-local:
 	-rm -rf build-aux

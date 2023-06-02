@@ -80,7 +80,7 @@ struct dhcp6_option_iter {
 	uint16_t max;
 };
 
-typedef void (*dhcp6_transport_rx_cb_t)(const void *, size_t, void *);
+typedef void (*dhcp6_transport_rx_cb_t)(const void *, size_t, uint64_t, void *);
 
 struct dhcp6_transport {
 	int (*open)(struct dhcp6_transport *s);
@@ -130,6 +130,7 @@ struct l_dhcp6_lease {
 	uint8_t *server_id;
 	size_t server_id_len;
 	uint8_t preference;
+	uint64_t start_time;
 
 	struct dhcp6_ia ia_na;
 	struct dhcp6_ia ia_pd;
@@ -147,7 +148,5 @@ void _dhcp6_lease_free(struct l_dhcp6_lease *lease);
 struct l_dhcp6_lease *_dhcp6_lease_parse_options(
 					struct dhcp6_option_iter *iter,
 					const uint8_t expected_iaid[static 4]);
-uint32_t _dhcp6_lease_get_t1(struct l_dhcp6_lease *lease);
-uint32_t _dhcp6_lease_get_t2(struct l_dhcp6_lease *lease);
-uint32_t _dhcp6_lease_get_valid_lifetime(struct l_dhcp6_lease *lease);
-uint32_t _dhcp6_lease_get_preferred_lifetime(struct l_dhcp6_lease *lease);
+uint32_t _dhcp6_lease_get_t1(const struct l_dhcp6_lease *lease);
+uint32_t _dhcp6_lease_get_t2(const struct l_dhcp6_lease *lease);

@@ -33,9 +33,9 @@
 #include "log.h"
 #include "queue.h"
 #include "io.h"
+#include "private.h"
 #include "netlink-private.h"
 #include "genl.h"
-#include "private.h"
 
 #define MAX_NESTING_LEVEL 4
 #define GENL_DEBUG(fmt, args...)	\
@@ -722,17 +722,6 @@ static bool match_request_hid(const void *a, const void *b)
 	return request->handle_id == id;
 }
 
-#define NLA_OK(nla,len)         ((len) >= (int) sizeof(struct nlattr) && \
-				(nla)->nla_len >= sizeof(struct nlattr) && \
-				(nla)->nla_len <= (len))
-#define NLA_NEXT(nla,attrlen)	((attrlen) -= NLMSG_ALIGN((nla)->nla_len), \
-				(struct nlattr*)(((char*)(nla)) + \
-				NLMSG_ALIGN((nla)->nla_len)))
-
-#define NLA_LENGTH(len)		(NLMSG_ALIGN(sizeof(struct nlattr)) + (len))
-#define NLA_DATA(nla)		((void*)(((char*)(nla)) + NLA_LENGTH(0)))
-#define NLA_PAYLOAD(nla)	((int)((nla)->nla_len) - NLA_LENGTH(0))
-
 static struct l_genl_msg *msg_alloc(uint8_t cmd, uint8_t version, uint32_t size)
 {
 	struct l_genl_msg *msg;
@@ -779,46 +768,15 @@ static struct l_genl_msg *msg_create(const struct nlmsghdr *nlmsg)
 
 	if (nlmsg->nlmsg_type == NLMSG_ERROR) {
 		struct nlmsgerr *err = NLMSG_DATA(nlmsg);
-		unsigned int offset = 0;
-		struct nlattr *nla;
-		int len;
+		const char *error_msg = NULL;
 
 		msg->error = err->error;
 
-		if (!(nlmsg->nlmsg_flags & NLM_F_ACK_TLVS))
-			goto done;
+		if (netlink_parse_ext_ack_error(nlmsg, &error_msg, NULL) &&
+						error_msg)
+			msg->error_msg = l_strdup(error_msg);
 
-		/*
-		 * If the message is capped, then err->msg.nlmsg_len contains
-		 * the length of the original message and thus can't be used
-		 * to calculate the offset
-		 */
-		if (!(nlmsg->nlmsg_flags & NLM_F_CAPPED))
-			offset = err->msg.nlmsg_len - sizeof(struct nlmsghdr);
-
-		/*
-		 * Attributes start past struct nlmsgerr.  The offset is 0
-		 * for NLM_F_CAPPED messages.  Otherwise the original message
-		 * is included, and thus the offset takes err->msg.nlmsg_len
-		 * into account
-		 */
-		nla = (void *)(err + 1) + offset;
-
-		/* Calculate bytes taken up by header + nlmsgerr contents */
-		offset += sizeof(struct nlmsghdr) + sizeof(struct nlmsgerr);
-		if (nlmsg->nlmsg_len <= offset)
-			goto done;
-
-		len = nlmsg->nlmsg_len - offset;
-
-		for (; NLA_OK(nla, len); nla = NLA_NEXT(nla, len)) {
-			if ((nla->nla_type & NLA_TYPE_MASK) !=
-					NLMSGERR_ATTR_MSG)
-				continue;
-
-			msg->error_msg = l_strdup(NLA_DATA(nla));
-			goto done;
-		}
+		goto done;
 	}
 
 	msg->data = l_memdup(nlmsg, nlmsg->nlmsg_len);
@@ -1115,6 +1073,7 @@ static struct l_genl_family_info *build_nlctrl_info()
 LIB_EXPORT struct l_genl *l_genl_new(void)
 {
 	struct l_genl *genl;
+	struct l_io *io;
 	struct sockaddr_nl addr;
 	socklen_t addrlen = sizeof(addr);
 	int fd;
@@ -1144,11 +1103,15 @@ LIB_EXPORT struct l_genl *l_genl_new(void)
 	setsockopt(fd, SOL_NETLINK, NETLINK_EXT_ACK,
 					&ext_ack, sizeof(ext_ack));
 
+	io = l_io_new(fd);
+	if (!io)
+		goto err;
+
 	genl = l_new(struct l_genl, 1);
 	genl->pid = addr.nl_pid;
 	genl->ref_count = 1;
 	genl->fd = fd;
-	genl->io = l_io_new(genl->fd);
+	genl->io = io;
 	l_io_set_read_handler(genl->io, received_data, genl,
 						read_watch_destroy);
 
@@ -1757,7 +1720,6 @@ LIB_EXPORT bool l_genl_attr_init(struct l_genl_attr *attr,
 	if (!NLA_OK(nla, len))
 		return false;
 
-	attr->msg = msg;
 	attr->data = NULL;
 	attr->len = 0;
 	attr->next_data = nla;
@@ -1798,7 +1760,7 @@ LIB_EXPORT bool l_genl_attr_next(struct l_genl_attr *attr,
 	return true;
 }
 
-LIB_EXPORT bool l_genl_attr_recurse(struct l_genl_attr *attr,
+LIB_EXPORT bool l_genl_attr_recurse(const struct l_genl_attr *attr,
 						struct l_genl_attr *nested)
 {
 	const struct nlattr *nla;
@@ -1810,7 +1772,6 @@ LIB_EXPORT bool l_genl_attr_recurse(struct l_genl_attr *attr,
 	if (!nla)
 		return false;
 
-	nested->msg = attr->msg;
 	nested->data = NULL;
 	nested->len = 0;
 	nested->next_data = NLA_DATA(nla);
@@ -1958,6 +1919,22 @@ done:
 	destroy_request(request);
 
 	return true;
+}
+
+LIB_EXPORT bool l_genl_family_request_sent(struct l_genl_family *family,
+						unsigned int id)
+{
+	struct l_genl *genl;
+
+	if (unlikely(!family) || unlikely(!id))
+		return false;
+
+	genl = family->genl;
+	if (!genl)
+		return false;
+
+	return l_queue_find(genl->pending_list, match_request_id,
+				L_UINT_TO_PTR(id)) != NULL;
 }
 
 static void add_membership(struct l_genl *genl, struct genl_mcast *mcast)

@@ -44,6 +44,7 @@ void l_rtnl_address_free(struct l_rtnl_address *addr);
 DEFINE_CLEANUP_FUNC(l_rtnl_address_free);
 bool l_rtnl_address_get_address(const struct l_rtnl_address *addr,
 				char *out_buf);
+const void *l_rtnl_address_get_in_addr(const struct l_rtnl_address *addr);
 uint8_t l_rtnl_address_get_family(const struct l_rtnl_address *addr);
 uint8_t l_rtnl_address_get_prefix_length(const struct l_rtnl_address *addr);
 bool l_rtnl_address_get_broadcast(const struct l_rtnl_address *addr,
@@ -60,17 +61,32 @@ uint32_t l_rtnl_address_get_preferred_lifetime(
 bool l_rtnl_address_set_lifetimes(struct l_rtnl_address *addr,
 						uint32_t preferred_lifetime,
 						uint32_t valid_lifetime);
+bool l_rtnl_address_get_expiry(const struct l_rtnl_address *addr,
+				uint64_t *preferred_expiry_time,
+				uint64_t *valid_expiry_time);
+bool l_rtnl_address_set_expiry(struct l_rtnl_address *addr,
+				uint64_t preferred_expiry_time,
+				uint64_t valid_expiry_time);
 bool l_rtnl_address_set_scope(struct l_rtnl_address *addr, uint8_t scope);
 
 struct l_rtnl_route *l_rtnl_route_new_gateway(const char *gw);
 struct l_rtnl_route *l_rtnl_route_new_prefix(const char *ip,
 							uint8_t prefix_len);
+struct l_rtnl_route *l_rtnl_route_new_static(const char *gw, const char *ip,
+							uint8_t prefix_len);
 void l_rtnl_route_free(struct l_rtnl_route *rt);
 DEFINE_CLEANUP_FUNC(l_rtnl_route_free);
 uint8_t l_rtnl_route_get_family(const struct l_rtnl_route *rt);
 bool l_rtnl_route_get_gateway(const struct l_rtnl_route *rt, char *out_buf);
+const void *l_rtnl_route_get_gateway_in_addr(const struct l_rtnl_route *rt);
+bool l_rtnl_route_get_dst(const struct l_rtnl_route *rt, char *out_buf,
+				uint8_t *out_prefix_len);
+const void *l_rtnl_route_get_dst_in_addr(const struct l_rtnl_route *rt,
+						uint8_t *out_prefix_len);
 uint32_t l_rtnl_route_get_lifetime(const struct l_rtnl_route *rt);
 bool l_rtnl_route_set_lifetime(struct l_rtnl_route *rt, uint32_t lt);
+uint64_t l_rtnl_route_get_expiry(const struct l_rtnl_route *rt);
+bool l_rtnl_route_set_expiry(struct l_rtnl_route *rt, uint64_t expiry_time);
 uint32_t l_rtnl_route_get_mtu(const struct l_rtnl_route *rt);
 bool l_rtnl_route_set_mtu(struct l_rtnl_route *rt, uint32_t mtu);
 uint8_t l_rtnl_route_get_preference(const struct l_rtnl_route *rt);
@@ -210,6 +226,8 @@ uint32_t l_rtnl_neighbor_set_hwaddr(struct l_netlink *rtnl, int ifindex,
 					l_netlink_command_func_t cb,
 					void *user_data,
 					l_netlink_destroy_func_t destroy);
+
+struct l_netlink *l_rtnl_get();
 
 #ifdef __cplusplus
 }

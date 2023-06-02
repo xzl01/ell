@@ -26,11 +26,22 @@
 
 #define _GNU_SOURCE
 #include <time.h>
+#include <sys/time.h>
 
 #include "time.h"
 #include "time-private.h"
 #include "random.h"
 #include "private.h"
+
+static uint64_t _time_from_timespec(const struct timespec *ts)
+{
+	return ts->tv_sec * L_USEC_PER_SEC + ts->tv_nsec / L_NSEC_PER_USEC;
+}
+
+static uint64_t _time_from_timeval(const struct timeval *tv)
+{
+	return tv->tv_sec * L_USEC_PER_SEC + tv->tv_usec;
+}
 
 /**
  * l_time_now:
@@ -44,8 +55,15 @@ LIB_EXPORT uint64_t l_time_now(void)
 	struct timespec now;
 
 	clock_gettime(CLOCK_BOOTTIME, &now);
+	return _time_from_timespec(&now);
+}
 
-	return (uint64_t) now.tv_sec * 1000000 + now.tv_nsec / 1000;
+uint64_t time_realtime_now(void)
+{
+	struct timespec now;
+
+	clock_gettime(CLOCK_REALTIME, &now);
+	return _time_from_timespec(&now);
 }
 
 /**
@@ -76,8 +94,8 @@ LIB_EXPORT uint64_t l_time_now(void)
 /* Compute ms + RAND*ms where RAND is in range -0.1 .. 0.1 */
 uint64_t _time_fuzz_msecs(uint64_t ms)
 {
-	 /* We do this by subtracting 0.1ms and adding 0.1ms * rand[0 .. 2] */
-        return ms - ms / 10 +
+	/* We do this by subtracting 0.1ms and adding 0.1ms * rand[0 .. 2] */
+	return ms - ms / 10 +
 			(l_getrandom_uint32() % (2 * L_MSEC_PER_SEC)) *
 						ms / 10 / L_MSEC_PER_SEC;
 }
@@ -104,4 +122,35 @@ uint64_t _time_fuzz_secs(uint32_t secs, uint32_t max_offset)
 		ms -= (r & 0x7fffffff) % max_offset;
 
 	return ms;
+}
+
+/*
+ * Convert a *recent* CLOCK_REALTIME-based timestamp to a
+ * CLOCK_BOOTTIME-based usec count consistent with l_time functions.
+ * The longer the time since the input timestamp the higher the
+ * probability of the two clocks having diverged and the higher the
+ * expected error magnitude.
+ */
+uint64_t _time_realtime_to_boottime(const struct timeval *ts)
+{
+	uint64_t now_realtime;
+	uint64_t now_boottime = l_time_now();
+	struct timespec timespec;
+	uint64_t ts_realtime;
+	uint64_t offset;
+
+	clock_gettime(CLOCK_REALTIME, &timespec);
+	now_realtime = _time_from_timespec(&timespec);
+	ts_realtime = _time_from_timeval(ts);
+	offset = l_time_diff(ts_realtime, now_realtime);
+
+	/* Most likely case, timestamp in the past */
+	if (l_time_before(ts_realtime, now_realtime)) {
+		if (offset > now_boottime)
+			return 0;
+
+		return now_boottime - offset;
+	}
+
+	return l_time_offset(now_boottime, offset);
 }

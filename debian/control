@@ -1,9 +1,10 @@
 Source: ell
 Maintainer: Nobuhiro Iwamatsu <iwamatsu@debian.org>
+Uploaders: Jonas Smedegaard <dr@jones.dk>
 Priority: optional
 Section: devel
-Build-Depends: debhelper-compat (= 13), libglib2.0-dev
-Standards-Version: 4.5.1
+Build-Depends: dbus-daemon <!nocheck>, debhelper-compat (= 13), libglib2.0-dev
+Standards-Version: 4.6.2
 Rules-Requires-Root: no
 Homepage: https://01.org/ell
 Vcs-Browser: https://salsa.debian.org/debian/ell
@@ -15,12 +16,12 @@ Section: libs
 Multi-Arch: same
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Embedded Linux library
- The Embedded Linux library (aka. ell) provides table, queues,
- ring buffers, cryptographic, and some functions for Embedded
- Devices.
+ The Embedded Linux library (aka. ell)
+ provides table, queues, ring buffers, cryptographic,
+ and some functions for Embedded Devices.
  .
- This package contains what you need to run programs that use this
- library.
+ This package contains what you need
+ to run programs that use this library.
 
 Package: libell-dev
 Architecture: linux-any
@@ -28,9 +29,9 @@ Section: libdevel
 Multi-Arch: same
 Depends: ${shlibs:Depends}, ${misc:Depends}, libell0 (= ${binary:Version})
 Description: development files for the Embedded Linux library
- The Embedded Linux library (aka. ell) provides table, queues,
- ring buffers, cryptographic, and some functions for Embedded
- Devices.
+ The Embedded Linux library (aka. ell)
+ provides table, queues, ring buffers, cryptographic,
+ and some functions for Embedded Devices.
  .
- This package contains what you need for compiling sources that
- use this library in your own code.
+ This package contains what you need
+ for compiling sources that use this library in your own code.

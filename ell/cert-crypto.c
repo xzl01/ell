@@ -216,7 +216,7 @@ uint8_t *cert_pkcs12_pbkdf(const char *password,
 	 * characters used.  Recalculate p_len after we know it.
 	 * Important: The password must be valid UTF-8 here.
 	 */
-	if (password) {
+	if (p_len) {
 		if (!(bmpstring = l_utf8_to_ucs2be(password, &passwd_len))) {
 			l_checksum_free(h);
 			return NULL;
@@ -236,6 +236,8 @@ uint8_t *cert_pkcs12_pbkdf(const char *password,
 		ptr += s_len + salt_len - j;
 	}
 
+_Pragma("GCC diagnostic push")
+_Pragma("GCC diagnostic ignored \"-Wmaybe-uninitialized\"")
 	if (p_len) {
 		for (j = passwd_len; j < p_len;
 					j += passwd_len, ptr += passwd_len)
@@ -246,6 +248,7 @@ uint8_t *cert_pkcs12_pbkdf(const char *password,
 		explicit_bzero(bmpstring, passwd_len);
 		l_free(bmpstring);
 	}
+_Pragma("GCC diagnostic pop")
 
 	key = l_malloc(key_len + hash->len);
 

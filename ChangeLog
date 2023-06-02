@@ -1,3 +1,49 @@
+ver 0.56:
+	Add support for TLS session resume interfaces.
+
+ver 0.55:
+	Fix issue with DHCP and blocked unicast requests.
+
+ver 0.54:
+	Add support for DHCPv6 SLAAC address creation.
+	Add support for control of optimistic DAD feature.
+	Add support for checking validity dates of certificates.
+	Add support for RFC 5746 Secure Renegotiation.
+
+ver 0.53:
+	Add support for EC based certificates.
+
+ver 0.52:
+	Fix issue with using PTRDIFF_MAX constant.
+	Fix issue with accepting FD 0 as epoll_fd.
+	Fix issue with setting bound time before emitting event.
+	Fix issue with starting ACD before committing static IPv4.
+	Fix issue with waiting for link-local address before DHCPv6.
+
+ver 0.51:
+	Fix issue with handling bad prefixes per RFC4862.
+	Fix issue with handling DHCP retransmission timers.
+	Add support for DHCP override and static IP API.
+
+ver 0.50:
+	Fix issue with D-Bus use-after-free crash when removing objects.
+	Fix issue with DHCP lease expiry based on frame reception times.
+
+ver 0.49:
+	Fix issue with multiple offers from the same DHCP server.
+	Fix issue with Base64 decoding and bytes consumed validation.
+
+ver 0.48:
+	Fix issue with memory leaking from ICMPv6 RA.
+
+ver 0.47:
+	Fix issue with memory leaking from DHCP leases.
+	Fix issue with NULL terminating of Base64 encoding.
+
+ver 0.46:
+	Fix issue with DHCP server when OPTION_ROUTER is not configured.
+	Fix issue with DHCP obtained lease to retrieve it properly.
+
 ver 0.45:
 	Fix issue with ICMPv6 and handling re-entrantly callbacks.
 

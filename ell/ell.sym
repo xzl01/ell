@@ -15,6 +15,8 @@ global:
 	l_streq0;
 	l_util_hexstring;
 	l_util_hexstring_upper;
+	l_util_hexstringv;
+	l_util_hexstringv_upper;
 	l_util_from_hexstring;
 	l_util_hexdump;
 	l_util_hexdump_two;
@@ -240,6 +242,7 @@ global:
 	l_dhcp_lease_get_t1;
 	l_dhcp_lease_get_t2;
 	l_dhcp_lease_get_lifetime;
+	l_dhcp_lease_get_start_time;
 	l_dhcp_client_new;
 	l_dhcp_client_destroy;
 	l_dhcp_client_add_request_option;
@@ -295,6 +298,9 @@ global:
 	l_dhcp6_lease_get_dns;
 	l_dhcp6_lease_get_domains;
 	l_dhcp6_lease_get_prefix_length;
+	l_dhcp6_lease_get_valid_lifetime;
+	l_dhcp6_lease_get_preferred_lifetime;
+	l_dhcp6_lease_get_start_time;
 	/* dir */
 	l_dir_watch_new;
 	l_dir_watch_destroy;
@@ -342,6 +348,7 @@ global:
 	l_genl_family_send;
 	l_genl_family_dump;
 	l_genl_family_cancel;
+	l_genl_family_request_sent;
 	l_genl_family_register;
 	l_genl_family_unregister;
 	/* hwdb */
@@ -451,6 +458,7 @@ global:
 	l_ringbuf_append;
 	/* settings */
 	l_settings_new;
+	l_settings_clone;
 	l_settings_free;
 	l_settings_load_from_data;
 	l_settings_to_data;
@@ -488,6 +496,7 @@ global:
 	l_settings_has_embedded_group;
 	l_settings_get_embedded_groups;
 	l_settings_get_embedded_value;
+	l_settings_remove_embedded_groups;
 	/* signal */
 	l_signal_create;
 	l_signal_remove;
@@ -506,10 +515,13 @@ global:
 	l_tls_write;
 	l_tls_start;
 	l_tls_close;
+	l_tls_reset;
 	l_tls_set_cacert;
 	l_tls_set_auth_data;
 	l_tls_set_version_range;
 	l_tls_set_domain_mask;
+	l_tls_set_session_cache;
+	l_tls_get_session_resumed;
 	l_tls_alert_to_str;
 	l_tls_set_debug;
 	l_tls_set_cert_dump_path;
@@ -529,7 +541,9 @@ global:
 	l_uintset_foreach;
 	l_uintset_clone;
 	l_uintset_intersect;
+	l_uintset_subtract;
 	l_uintset_isempty;
+	l_uintset_size;
 	/* uuid */
 	l_uuid_v3;
 	l_uuid_v4;
@@ -543,6 +557,7 @@ global:
 	l_cert_free;
 	l_cert_get_der_data;
 	l_cert_get_dn;
+	l_cert_get_valid_times;
 	l_cert_get_pubkey_type;
 	l_cert_get_pubkey;
 	l_certchain_free;
@@ -570,6 +585,7 @@ global:
 	l_ecc_point_from_data;
 	l_ecc_point_get_x;
 	l_ecc_point_get_y;
+	l_ecc_point_y_isodd;
 	l_ecc_point_get_data;
 	l_ecc_point_inverse;
 	l_ecc_point_multiply;
@@ -615,6 +631,7 @@ global:
 	l_rtnl_address_clone;
 	l_rtnl_address_free;
 	l_rtnl_address_get_address;
+	l_rtnl_address_get_in_addr;
 	l_rtnl_address_get_family;
 	l_rtnl_address_get_prefix_length;
 	l_rtnl_address_get_broadcast;
@@ -625,14 +642,22 @@ global:
 	l_rtnl_address_get_valid_lifetime;
 	l_rtnl_address_get_preferred_lifetime;
 	l_rtnl_address_set_lifetimes;
+	l_rtnl_address_get_expiry;
+	l_rtnl_address_set_expiry;
 	l_rtnl_address_set_scope;
 	l_rtnl_route_new_gateway;
 	l_rtnl_route_new_prefix;
+	l_rtnl_route_new_static;
 	l_rtnl_route_free;
 	l_rtnl_route_get_family;
 	l_rtnl_route_get_gateway;
+	l_rtnl_route_get_gateway_in_addr;
+	l_rtnl_route_get_dst;
+	l_rtnl_route_get_dst_in_addr;
 	l_rtnl_route_get_lifetime;
 	l_rtnl_route_set_lifetime;
+	l_rtnl_route_get_expiry;
+	l_rtnl_route_set_expiry;
 	l_rtnl_route_get_mtu;
 	l_rtnl_route_set_mtu;
 	l_rtnl_route_get_preference;
@@ -671,21 +696,25 @@ global:
 	l_rtnl_ifaddr_delete;
 	l_rtnl_neighbor_get_hwaddr;
 	l_rtnl_neighbor_set_hwaddr;
-/* icmp6 */
+	l_rtnl_get;
+	/* icmp6 */
 	l_icmp6_client_new;
 	l_icmp6_client_free;
 	l_icmp6_client_start;
 	l_icmp6_client_stop;
 	l_icmp6_client_get_router;
-	l_icmp6_client_set_event_handler;
+	l_icmp6_client_add_event_handler;
 	l_icmp6_client_set_debug;
 	l_icmp6_client_set_address;
 	l_icmp6_client_set_nodelay;
 	l_icmp6_client_set_rtnl;
 	l_icmp6_client_set_route_priority;
+	l_icmp6_client_set_link_local_address;
 	l_icmp6_router_get_address;
 	l_icmp6_router_get_managed;
 	l_icmp6_router_get_other;
+	l_icmp6_router_get_lifetime;
+	l_icmp6_router_get_start_time;
 	/* acd */
 	l_acd_new;
 	l_acd_start;
@@ -716,6 +745,32 @@ global:
 	l_tester_post_teardown_complete;
 	l_tester_post_teardown_failed;
 	l_tester_wait;
+	/* netconfig */
+	l_netconfig_new;
+	l_netconfig_destroy;
+	l_netconfig_set_family_enabled;
+	l_netconfig_set_hostname;
+	l_netconfig_set_route_priority;
+	l_netconfig_set_static_addr;
+	l_netconfig_set_gateway_override;
+	l_netconfig_set_dns_override;
+	l_netconfig_set_domain_names_override;
+	l_netconfig_set_acd_enabled;
+	l_netconfig_set_optimistic_dad_enabled;
+	l_netconfig_check_config;
+	l_netconfig_reset_config;
+	l_netconfig_start;
+	l_netconfig_stop;
+	l_netconfig_unconfigure;
+	l_netconfig_get_dhcp_client;
+	l_netconfig_get_dhcp6_client;
+	l_netconfig_get_icmp6_client;
+	l_netconfig_set_event_handler;
+	l_netconfig_apply_rtnl;
+	l_netconfig_get_addresses;
+	l_netconfig_get_routes;
+	l_netconfig_get_dns_list;
+	l_netconfig_get_domain_names;
 local:
 	*;
 };

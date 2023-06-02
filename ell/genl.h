@@ -76,7 +76,6 @@ bool l_genl_request_family(struct l_genl *genl, const char *name,
 					l_genl_destroy_func_t destroy);
 
 struct l_genl_attr {
-	struct l_genl_msg *msg;
 	const void *data;
 	uint32_t len;
 	const void *next_data;
@@ -109,7 +108,8 @@ bool l_genl_msg_leave_nested(struct l_genl_msg *msg);
 bool l_genl_attr_init(struct l_genl_attr *attr, struct l_genl_msg *msg);
 bool l_genl_attr_next(struct l_genl_attr *attr, uint16_t *type,
 					uint16_t *len, const void **data);
-bool l_genl_attr_recurse(struct l_genl_attr *attr, struct l_genl_attr *nested);
+bool l_genl_attr_recurse(const struct l_genl_attr *attr,
+				struct l_genl_attr *nested);
 
 bool l_genl_family_info_has_group(const struct l_genl_family_info *info,
 					const char *group);
@@ -141,6 +141,7 @@ unsigned int l_genl_family_dump(struct l_genl_family *family,
 				void *user_data,
 				l_genl_destroy_func_t destroy);
 bool l_genl_family_cancel(struct l_genl_family *family, unsigned int id);
+bool l_genl_family_request_sent(struct l_genl_family *family, unsigned int id);
 
 unsigned int l_genl_family_register(struct l_genl_family *family,
 				const char *group, l_genl_msg_func_t callback,

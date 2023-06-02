@@ -231,7 +231,10 @@ static void test_certificates(const void *data)
 	struct l_queue *wrongca;
 	struct l_queue *wrongca2;
 	struct l_queue *twocas;
+	struct l_cert *expired;
+	struct l_queue *mixedcas;
 	struct l_certchain *chain;
+	struct l_certchain *expiredchain;
 
 	cacert = l_pem_load_certificate_list(CERTDIR "cert-ca.pem");
 	assert(cacert && !l_queue_isempty(cacert));
@@ -245,8 +248,17 @@ static void test_certificates(const void *data)
 	twocas = l_pem_load_certificate_list(CERTDIR "cert-chain.pem");
 	assert(twocas);
 
+	mixedcas = l_pem_load_certificate_list(CERTDIR "cert-chain.pem");
+	assert(mixedcas);
+	expired = load_cert_file(CERTDIR "cert-expired.pem");
+	assert(expired);
+	l_queue_push_tail(mixedcas, expired);
+
 	chain = l_pem_load_certificate_chain(CERTDIR "cert-server.pem");
 	assert(chain);
+
+	expiredchain = l_pem_load_certificate_chain(CERTDIR "cert-expired.pem");
+	assert(expiredchain);
 
 	assert(!l_certchain_verify(chain, wrongca, NULL));
 	assert(l_certchain_verify(chain, cacert, NULL));
@@ -294,6 +306,7 @@ static void test_certificates(const void *data)
 	assert(l_certchain_verify(chain, cacert, NULL));
 	assert(l_certchain_verify(chain, NULL, NULL));
 	assert(l_certchain_verify(chain, twocas, NULL));
+	assert(l_certchain_verify(chain, mixedcas, NULL));
 
 	l_certchain_free(chain);
 	l_queue_destroy(cacert, (l_queue_destroy_func_t) l_cert_free);
@@ -317,12 +330,35 @@ static void test_certificates(const void *data)
 	assert(l_certchain_verify(chain, cacert, NULL));
 	assert(l_certchain_verify(chain, NULL, NULL));
 	assert(!l_certchain_verify(chain, twocas, NULL));
+	assert(!l_certchain_verify(chain, mixedcas, NULL));
+
+	assert(!l_certchain_verify(expiredchain, NULL, NULL));
 
 	l_certchain_free(chain);
+	l_certchain_free(expiredchain);
 	l_queue_destroy(cacert, (l_queue_destroy_func_t) l_cert_free);
 	l_queue_destroy(wrongca, (l_queue_destroy_func_t) l_cert_free);
 	l_queue_destroy(wrongca2, (l_queue_destroy_func_t) l_cert_free);
 	l_queue_destroy(twocas, (l_queue_destroy_func_t) l_cert_free);
+	l_queue_destroy(mixedcas, (l_queue_destroy_func_t) l_cert_free);
+}
+
+static void test_ec_certificates(const void *data)
+{
+	struct l_queue *cacert;
+	struct l_certchain *chain;
+
+	cacert = l_pem_load_certificate_list(CERTDIR "ec-cert-ca.pem");
+	assert(cacert && !l_queue_isempty(cacert));
+
+	chain = l_pem_load_certificate_chain(CERTDIR "ec-cert-server.pem");
+	assert(chain);
+
+	assert(l_certchain_verify(chain, cacert, NULL));
+	assert(l_certchain_verify(chain, NULL, NULL));
+
+	l_certchain_free(chain);
+	l_queue_destroy(cacert, (l_queue_destroy_func_t) l_cert_free);
 }
 
 struct tls_conn_test {
@@ -948,8 +984,10 @@ int main(int argc, char *argv[])
 	l_test_add("TLS 1.2 PRF with SHA512", test_tls12_prf,
 			&tls12_prf_sha512_0);
 
-	if (l_key_is_supported(L_KEY_FEATURE_RESTRICT))
+	if (l_key_is_supported(L_KEY_FEATURE_RESTRICT)) {
 		l_test_add("Certificate chains", test_certificates, NULL);
+		l_test_add("ECDSA Certificates", test_ec_certificates, NULL);
+	}
 
 	if (!l_getrandom_is_supported()) {
 		printf("getrandom missing, skipping TLS connection tests...\n");
@@ -1029,6 +1067,9 @@ int main(int argc, char *argv[])
 		struct tls_cipher_suite *suite = tls_cipher_suite_pref[i];
 		struct tls_bulk_encryption_algorithm *alg = suite->encryption;
 		bool supported;
+
+		if (l_str_has_prefix(suite->name, "TLS_ECDHE_ECDSA"))
+			continue;
 
 		if (alg->cipher_type == TLS_CIPHER_AEAD)
 			supported = l_aead_cipher_is_supported(alg->l_aead_id);

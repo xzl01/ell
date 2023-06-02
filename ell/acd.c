@@ -181,10 +181,13 @@ static void announce_wait_timeout(struct l_timeout *timeout, void *user_data)
 	}
 
 	if (acd->retries != ANNOUNCE_NUM) {
+		int err = acd_send_packet(acd, acd->ip);
+
 		acd->retries++;
 
-		if (acd_send_packet(acd, acd->ip) < 0) {
-			ACD_DEBUG("Failed to send ACD announcement");
+		if (err < 0) {
+			ACD_DEBUG("Failed to send ACD announcement: %s",
+					strerror(-err));
 			return;
 		}
 
@@ -202,12 +205,13 @@ static void announce_wait_timeout(struct l_timeout *timeout, void *user_data)
 static void probe_wait_timeout(struct l_timeout *timeout, void *user_data)
 {
 	struct l_acd *acd = user_data;
+	int err;
 	uint32_t delay;
 
 	ACD_DEBUG("Sending ACD Probe");
 
-	if (acd_send_packet(acd, 0) < 0) {
-		ACD_DEBUG("Failed to send ACD probe");
+	if ((err = acd_send_packet(acd, 0)) < 0) {
+		ACD_DEBUG("Failed to send ACD probe: %s", strerror(-err));
 		return;
 	}
 
@@ -260,6 +264,7 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 	int source_conflict;
 	int target_conflict;
 	bool probe;
+	int err;
 
 	memset(&arp, 0, sizeof(arp));
 	len = read(l_io_get_fd(acd->io), &arp, sizeof(arp));
@@ -281,11 +286,8 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 	target_conflict = probe &&
 		!memcmp(arp.arp_tpa, &acd->ip, sizeof(uint32_t));
 
-	if (!source_conflict && !target_conflict) {
-		ACD_DEBUG("No target or source conflict detected for "NIPQUAD_FMT,
-				NIPQUAD(acd->ip));
+	if (!source_conflict && !target_conflict)
 		return true;
-	}
 
 	switch (acd->state) {
 	case ACD_STATE_PROBE:
@@ -315,11 +317,11 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 		if (acd->policy == L_ACD_DEFEND_POLICY_NONE) {
 			ACD_DEBUG("Conflict detected, giving up address");
 
+			l_acd_stop(acd);
+
 			if (acd->event_func)
 				acd->event_func(L_ACD_EVENT_LOST,
 							acd->user_data);
-
-			l_acd_stop(acd);
 
 			break;
 		}
@@ -343,7 +345,10 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 		if (acd->timeout)
 			l_timeout_remove(acd->timeout);
 
-		acd_send_packet(acd, acd->ip);
+		err = acd_send_packet(acd, acd->ip);
+		if (err < 0)
+			ACD_DEBUG("Failed to send initial announcement: %s",
+					strerror(-err));
 
 		ACD_DEBUG("Defending address");
 
@@ -382,6 +387,8 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 		acd->timeout = NULL;
 
 		ACD_DEBUG("Lost address");
+		l_acd_stop(acd);
+
 		/*
 		* RFC 5227 Section 2.4(b)
 		* "if this is not the first conflicting ARP packet the host has seen,
@@ -392,8 +399,6 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 		*/
 		if (acd->event_func)
 			acd->event_func(L_ACD_EVENT_LOST, acd->user_data);
-
-		l_acd_stop(acd);
 
 		break;
 	}
@@ -428,12 +433,13 @@ LIB_EXPORT bool l_acd_start(struct l_acd *acd, const char *ip)
 		return false;
 
 	if (l_memeqzero(acd->mac, ETH_ALEN) &&
-			!l_net_get_mac_address(acd->ifindex, acd->mac)) {
-		close(fd);
-		return false;
-	}
+			!l_net_get_mac_address(acd->ifindex, acd->mac))
+		goto err;
 
 	acd->io = l_io_new(fd);
+	if (!acd->io)
+		goto err;
+
 	l_io_set_close_on_destroy(acd->io, true);
 	l_io_set_read_handler(acd->io, acd_read_handler, acd, NULL);
 
@@ -471,6 +477,10 @@ LIB_EXPORT bool l_acd_start(struct l_acd *acd, const char *ip)
 							acd, NULL);
 
 	return true;
+
+err:
+	close(fd);
+	return false;
 }
 
 LIB_EXPORT bool l_acd_set_event_handler(struct l_acd *acd,

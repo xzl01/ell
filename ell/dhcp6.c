@@ -394,7 +394,6 @@ struct l_dhcp6_client {
 	struct l_timeout *timeout_send;
 	struct l_dhcp6_lease *lease;
 	struct l_timeout *timeout_lease;
-	uint64_t lease_start_t;
 
 	struct l_icmp6_client *icmp6;
 
@@ -850,6 +849,14 @@ static inline void dhcp6_client_event_notify(struct l_dhcp6_client *client,
 		client->event_handler(client, event, client->event_data);
 }
 
+static void dhcp6_client_enter_state(struct l_dhcp6_client *client,
+					enum dhcp6_state new_state)
+{
+	client->state = new_state;
+	l_util_debug(client->debug_handler, client->debug_data,
+			"Entering state: %s", dhcp6_state_to_str(new_state));
+}
+
 static inline void dhcp6_client_new_transaction(struct l_dhcp6_client *client,
 						enum dhcp6_state new_state)
 {
@@ -858,9 +865,7 @@ static inline void dhcp6_client_new_transaction(struct l_dhcp6_client *client,
 	client->transaction_id = l_getrandom_uint32() & 0x00FFFFFFU;
 	client->transaction_start_t = 0;
 
-	client->state = new_state;
-	l_util_debug(client->debug_handler, client->debug_data,
-			"Entering state: %s", dhcp6_state_to_str(new_state));
+	dhcp6_client_enter_state(client, new_state);
 }
 
 static void dhcp6_client_timeout_send(struct l_timeout *timeout,
@@ -895,8 +900,8 @@ static void dhcp6_client_t2_expired(struct l_timeout *timeout, void *user_data)
 {
 	struct l_dhcp6_client *client = user_data;
 	uint32_t elapsed =
-		l_time_to_msecs(l_time_now() - client->lease_start_t);
-	uint32_t valid = _dhcp6_lease_get_valid_lifetime(client->lease) *
+		l_time_to_msecs(l_time_now() - client->lease->start_time);
+	uint32_t valid = l_dhcp6_lease_get_valid_lifetime(client->lease) *
 				L_MSEC_PER_SEC;
 
 	CLIENT_DEBUG("");
@@ -956,24 +961,32 @@ static void dhcp6_client_address_add_cb(int error, uint16_t type,
 	}
 }
 
-static void dhcp6_client_setup_lease(struct l_dhcp6_client *client)
+static void dhcp6_client_setup_lease(struct l_dhcp6_client *client,
+					uint64_t timestamp)
 {
 	uint32_t t1 = _dhcp6_lease_get_t1(client->lease);
 	uint32_t t2 = _dhcp6_lease_get_t2(client->lease);
+	enum l_dhcp6_client_event event;
 
-	client->lease_start_t = l_time_now();
+	client->lease->start_time = timestamp;
 
 	/* TODO: Emit IP_CHANGED if any addresses were removed / added */
-	if (client->state == DHCP6_STATE_REQUESTING ||
-			client->state == DHCP6_STATE_SOLICITING)
-		dhcp6_client_event_notify(client,
-					L_DHCP6_CLIENT_EVENT_LEASE_OBTAINED);
+	if (L_IN_SET(client->state, DHCP6_STATE_REQUESTING,
+				DHCP6_STATE_SOLICITING,
+				DHCP6_STATE_REQUESTING_INFORMATION))
+		event = L_DHCP6_CLIENT_EVENT_LEASE_OBTAINED;
 	else
-		dhcp6_client_event_notify(client,
-					L_DHCP6_CLIENT_EVENT_LEASE_RENEWED);
+		event = L_DHCP6_CLIENT_EVENT_LEASE_RENEWED;
 
 	l_timeout_remove(client->timeout_lease);
 	client->timeout_lease = NULL;
+
+	/*
+	 * Switch over to BOUND state so that l_dhcp6_client_get_lease() will
+	 * return the lease properly
+	 */
+	dhcp6_client_enter_state(client, DHCP6_STATE_BOUND);
+	dhcp6_client_event_notify(client, event);
 
 	if (t1 == 0xffffffff || t2 == 0xffffffff) {
 		CLIENT_DEBUG("T1 (%u) or T2 (%u) was infinite", t1, t2);
@@ -990,12 +1003,14 @@ static void dhcp6_client_setup_lease(struct l_dhcp6_client *client)
 			l_dhcp6_lease_get_address(client->lease);
 		uint8_t prefix_len =
 			l_dhcp6_lease_get_prefix_length(client->lease);
-		uint32_t p = _dhcp6_lease_get_preferred_lifetime(client->lease);
-		uint32_t v = _dhcp6_lease_get_valid_lifetime(client->lease);
+		uint32_t p = l_dhcp6_lease_get_preferred_lifetime(client->lease);
+		uint32_t v = l_dhcp6_lease_get_valid_lifetime(client->lease);
 
 		a = l_rtnl_address_new(ip, prefix_len);
 		l_rtnl_address_set_noprefixroute(a, true);
 		l_rtnl_address_set_lifetimes(a, p, v);
+		l_rtnl_address_set_expiry(a, timestamp + p * L_USEC_PER_SEC,
+						timestamp + v * L_USEC_PER_SEC);
 
 		client->rtnl_add_cmdid =
 			l_rtnl_ifaddr_add(client->rtnl, client->ifindex, a,
@@ -1083,6 +1098,7 @@ bool _dhcp6_option_iter_next(struct dhcp6_option_iter *iter, uint16_t *type,
 }
 
 static int dhcp6_client_validate_message(struct l_dhcp6_client *client,
+					bool expect_client_id,
 					const struct dhcp6_message *message,
 					size_t len)
 {
@@ -1190,7 +1206,7 @@ static int dhcp6_client_validate_message(struct l_dhcp6_client *client,
 		}
 	}
 
-	if (!duid_verified) {
+	if (expect_client_id && !duid_verified) {
 		CLIENT_DEBUG("Message %s - no client id option found", mstr);
 		return -EBADMSG;
 	}
@@ -1214,7 +1230,7 @@ static int dhcp6_client_receive_advertise(struct l_dhcp6_client *client,
 	if (advertise->msg_type != DHCP6_MESSAGE_TYPE_ADVERTISE)
 		return -EINVAL;
 
-	r = dhcp6_client_validate_message(client, advertise, len);
+	r = dhcp6_client_validate_message(client, true, advertise, len);
 	if (r < 0)
 		return r;
 
@@ -1296,11 +1312,17 @@ static int dhcp6_client_receive_reply(struct l_dhcp6_client *client,
 	struct l_dhcp6_lease *lease;
 	struct dhcp6_option_iter iter;
 	int r;
+	/*
+	 * Per RFC 7844 Section 4.3.1 we never send Client ID options in
+	 * Information-requests so don't expect the replies to contain them.
+	 */
+	bool expect_client_id =
+		(client->state != DHCP6_STATE_REQUESTING_INFORMATION);
 
 	if (reply->msg_type != DHCP6_MESSAGE_TYPE_REPLY)
 		return -EINVAL;
 
-	r = dhcp6_client_validate_message(client, reply, len);
+	r = dhcp6_client_validate_message(client, expect_client_id, reply, len);
 	if (r < 0)
 		return r;
 
@@ -1341,7 +1363,7 @@ bad_lease:
 }
 
 static void dhcp6_client_rx_message(const void *data, size_t len,
-								void *userdata)
+					uint64_t timestamp, void *userdata)
 {
 	struct l_dhcp6_client *client = userdata;
 	const struct dhcp6_message *message = data;
@@ -1371,7 +1393,8 @@ static void dhcp6_client_rx_message(const void *data, size_t len,
 	case DHCP6_STATE_BOUND:
 		return;
 	case DHCP6_STATE_REQUESTING_INFORMATION:
-		if (dhcp6_client_receive_reply(client, message, len) < 0)
+		r = dhcp6_client_receive_reply(client, message, len);
+		if (r < 0)
 			return;
 
 		break;
@@ -1401,8 +1424,7 @@ static void dhcp6_client_rx_message(const void *data, size_t len,
 	if (r == DHCP6_STATE_BOUND) {
 		l_timeout_remove(client->timeout_send);
 		client->timeout_send = NULL;
-		dhcp6_client_setup_lease(client);
-		dhcp6_client_new_transaction(client, r);
+		dhcp6_client_setup_lease(client, timestamp);
 		return;
 	}
 
@@ -1456,12 +1478,12 @@ static void dhcp6_client_send_initial(struct l_dhcp6_client *client)
 
 static void dhcp6_client_icmp6_event(struct l_icmp6_client *icmp6,
 					enum l_icmp6_client_event event,
-					void *user_data)
+					void *event_data, void *user_data)
 {
 	struct l_dhcp6_client *client = user_data;
 
-	l_timeout_remove(client->timeout_send);
-	client->timeout_send = NULL;
+	if (client->nora)
+		return;
 
 	switch (event) {
 	case L_ICMP6_CLIENT_EVENT_ROUTER_FOUND:
@@ -1475,6 +1497,13 @@ static void dhcp6_client_icmp6_event(struct l_icmp6_client *icmp6,
 				managed ? "yes" : "no",
 				other ? "yes" : "no");
 
+		/* We only process the first RA received for now */
+		if (!client->timeout_send)
+			return;
+
+		l_timeout_remove(client->timeout_send);
+		client->timeout_send = NULL;
+
 		if (!managed && !other) {
 			l_dhcp6_client_stop(client);
 			dhcp6_client_event_notify(client,
@@ -1482,7 +1511,7 @@ static void dhcp6_client_icmp6_event(struct l_icmp6_client *icmp6,
 			return;
 		}
 
-		if (l_icmp6_router_get_managed(r))
+		if (managed)
 			dhcp6_client_send_initial(client);
 
 		break;
@@ -1507,10 +1536,9 @@ LIB_EXPORT struct l_dhcp6_client *l_dhcp6_client_new(uint32_t ifindex)
 
 	client->state = DHCP6_STATE_INIT;
 	client->ifindex = ifindex;
-	client->request_na = true;
 
 	client->icmp6 = l_icmp6_client_new(ifindex);
-	l_icmp6_client_set_event_handler(client->icmp6,
+	l_icmp6_client_add_event_handler(client->icmp6,
 						dhcp6_client_icmp6_event,
 						client, NULL);
 
@@ -1601,6 +1629,9 @@ LIB_EXPORT bool l_dhcp6_client_set_link_local_address(
 
 	if (inet_pton(AF_INET6, ll, &client->ll_address) != 1)
 		return false;
+
+	if (!client->nora)
+		l_icmp6_client_set_link_local_address(client->icmp6, ll, false);
 
 	return true;
 }
@@ -1779,6 +1810,8 @@ LIB_EXPORT bool l_dhcp6_client_start(struct l_dhcp6_client *client)
 		client_duid_generate_addr(client);
 	else
 		client_duid_generate_addr_plus_time(client);
+
+	client->request_na = !client->stateless;
 
 	if (!client->transport) {
 		client->transport =
