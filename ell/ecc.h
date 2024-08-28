@@ -1,34 +1,19 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2018  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2018 Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifndef __ELL_ECC_H
 #define __ELL_ECC_H
 
+#include <sys/types.h>
+#include <ell/cleanup.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <sys/types.h> // for ssize_t
-#include <ell/cleanup.h>
 
 #define L_ECC_MAX_DIGITS 6
 #define L_ECC_SCALAR_MAX_BYTES		L_ECC_MAX_DIGITS * 8
@@ -77,9 +62,12 @@ DEFINE_CLEANUP_FUNC(l_ecc_point_free);
 
 struct l_ecc_scalar *l_ecc_scalar_new(const struct l_ecc_curve *curve,
 						const void *buf, size_t len);
+struct l_ecc_scalar *l_ecc_scalar_clone(const struct l_ecc_scalar *s);
 struct l_ecc_scalar *l_ecc_scalar_new_random(
 					const struct l_ecc_curve *curve);
 struct l_ecc_scalar *l_ecc_scalar_new_modp(const struct l_ecc_curve *curve,
+						const void *buf, size_t len);
+struct l_ecc_scalar *l_ecc_scalar_new_modn(const struct l_ecc_curve *curve,
 						const void *buf, size_t len);
 struct l_ecc_scalar *l_ecc_scalar_new_reduced_1_to_n(
 					const struct l_ecc_curve *curve,
@@ -98,6 +86,8 @@ bool l_ecc_scalar_add(struct l_ecc_scalar *ret, const struct l_ecc_scalar *a,
 bool l_ecc_point_multiply(struct l_ecc_point *ret,
 				const struct l_ecc_scalar *scalar,
 				const struct l_ecc_point *point);
+bool l_ecc_point_multiply_g(struct l_ecc_point *ret,
+				const struct l_ecc_scalar *scalar);
 bool l_ecc_point_add(struct l_ecc_point *ret, const struct l_ecc_point *a,
 				const struct l_ecc_point *b);
 bool l_ecc_point_inverse(struct l_ecc_point *p);
@@ -114,6 +104,7 @@ bool l_ecc_scalars_are_equal(const struct l_ecc_scalar *a,
 
 bool l_ecc_points_are_equal(const struct l_ecc_point *a,
 				const struct l_ecc_point *b);
+bool l_ecc_point_is_infinity(const struct l_ecc_point *p);
 
 #ifdef __cplusplus
 }

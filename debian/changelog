@@ -1,3 +1,124 @@
+ell (0.67-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+  [ Jonas Smedegaard ]
+  * update symbols: added 2 symbols
+
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 10 Jul 2024 08:12:10 +0200
+
+ell (0.66-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+  [ Jonas Smedegaard ]
+  * update copyright info: update coverage
+  * update symbols: added 7 symbols
+
+ -- Jonas Smedegaard <dr@jones.dk>  Thu, 06 Jun 2024 15:01:31 +0200
+
+ell (0.65-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+  [ Jonas Smedegaard ]
+  * declare compliance with Debian Policy 4.7.0
+
+ -- Jonas Smedegaard <dr@jones.dk>  Tue, 30 Apr 2024 22:45:15 +0200
+
+ell (0.64-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+  [ Jonas Smedegaard ]
+  * enable LFS support for HPPA,
+    by setting future=+lfs in DEB_BUILD_MAINT_OPTIONS;
+    closes: bug#1031125, thanks to Helge Deller
+  * update symbols:
+    + add 1 symbol
+    + strip debian revision from 5 symbols
+  * drop obsolete Homepage URI
+
+ -- Jonas Smedegaard <dr@jones.dk>  Sat, 30 Mar 2024 13:03:54 +0100
+
+ell (0.63-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 28 Feb 2024 07:44:41 +0100
+
+ell (0.62-2) unstable; urgency=medium
+
+  * update symbols: added 5 symbols
+
+ -- Jonas Smedegaard <dr@jones.dk>  Sun, 11 Feb 2024 19:16:57 +0100
+
+ell (0.62-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+ -- Jonas Smedegaard <dr@jones.dk>  Sun, 11 Feb 2024 19:09:19 +0100
+
+ell (0.61-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release(s)
+
+  [ Jonas Smedegaard ]
+  * update symbols: added 3 symbols
+
+ -- Jonas Smedegaard <dr@jones.dk>  Thu, 30 Nov 2023 11:33:21 +0100
+
+ell (0.59-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+  [ Nobuhiro Iwamatsu ]
+  * d/copyright: Drop license paragraph of build-aux
+  * d/copyright: Drop license paragraph of build-aux
+  * d/copyright: Drop license paragraph of aclocal.m4
+  * d/copyright: Drop license paragraph of configure
+  * d/copyright: Drop license paragraph of Makefile.in
+  * d/libell0.symbols: Added 6 symbols
+  * d/copyright: Drop license sentences that are not referenced
+  * d/source/lintian-overrides: Update
+
+ -- Nobuhiro Iwamatsu <iwamatsu@debian.org>  Mon, 16 Oct 2023 11:26:56 +0900
+
+ell (0.58-2) unstable; urgency=medium
+
+  * build-depend on procps,
+    needed for new sysctl test
+
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 30 Aug 2023 12:28:50 +0200
+
+ell (0.58-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+  [ Jonas Smedegaard ]
+  * update copyright info: update coverage
+  * simplify rules:
+    + stop explicitly enable autoreconf,
+      done by default with debhelper compat level 13
+
+ -- Jonas Smedegaard <dr@jones.dk>  Wed, 30 Aug 2023 11:47:26 +0200
+
+ell (0.57-1) unstable; urgency=medium
+
+  [ upstream ]
+  * new release
+
+ -- Jonas Smedegaard <dr@jones.dk>  Mon, 12 Jun 2023 17:53:47 +0200
+
 ell (0.56-3) unstable; urgency=medium
 
   [ Helmut Grohne ]

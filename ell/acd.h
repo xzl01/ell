@@ -1,33 +1,18 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2020  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2020  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifndef __ELL_ACD_H
 #define __ELL_ACD_H
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdbool.h>
 
 struct l_acd;
 
@@ -55,7 +40,7 @@ bool l_acd_set_event_handler(struct l_acd *acd, l_acd_event_func_t cb,
 bool l_acd_stop(struct l_acd *acd);
 void l_acd_destroy(struct l_acd *acd);
 bool l_acd_set_debug(struct l_acd *acd, l_acd_debug_cb_t function,
-			void *user_data, l_acd_destroy_func_t destory);
+			void *user_data, l_acd_destroy_func_t destroy);
 bool l_acd_set_skip_probes(struct l_acd *acd, bool skip);
 bool l_acd_set_defend_policy(struct l_acd *acd,
 				enum l_acd_defend_policy policy);

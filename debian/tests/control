@@ -1,3 +1,6 @@
 Tests: build
-Depends: libglib2.0-dev, build-essential, libell-dev
+Depends:
+ build-essential,
+ libell-dev,
+ libglib2.0-dev,
 Restrictions: allow-stderr, superficial

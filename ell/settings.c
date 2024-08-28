@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -61,7 +46,7 @@ struct embedded_group_data {
 	char *name;
 	char type[32];
 	size_t len;
-	char data[0];
+	char data[];
 };
 
 struct group_data {
@@ -1123,28 +1108,12 @@ LIB_EXPORT bool l_settings_get_uint(const struct l_settings *settings,
 					unsigned int *out)
 {
 	const char *value = l_settings_get_value(settings, group_name, key);
-	unsigned long int r;
-	unsigned int t;
-	char *endp;
 
 	if (!value)
 		return false;
 
-	/* Do not allow '+' or '-' or empty string */
-	if (!l_ascii_isdigit(*value))
+	if (l_safe_atou32(value, out) < 0)
 		goto error;
-
-	errno = 0;
-
-	t = r = strtoul(value, &endp, 0);
-	if (*endp != '\0')
-		goto error;
-
-	if (unlikely(errno == ERANGE || r != t))
-		goto error;
-
-	if (out)
-		*out = r;
 
 	return true;
 

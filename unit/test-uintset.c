@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2015-2019  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2015-2019  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -426,7 +411,7 @@ static void test_uintset_subtract(const void *data)
 	assert(!l_uintset_contains(sub, 64));
 	l_uintset_free(sub);
 
-	l_uintset_take(set_b, 64);
+	assert(l_uintset_take(set_b, 64));
 
 	/* (64) - (65, 63) = (64) */
 	sub = l_uintset_subtract(set_a, set_b);
@@ -439,6 +424,9 @@ static void test_uintset_subtract(const void *data)
 	assert(!l_uintset_contains(sub, 64));
 	assert(l_uintset_contains(sub, 63));
 	l_uintset_free(sub);
+
+	l_uintset_free(set_b);
+	l_uintset_free(set_a);
 }
 
 int main(int argc, char *argv[])

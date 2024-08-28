@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -47,7 +32,7 @@ struct entry {
 /**
  * l_hashmap:
  *
- * Opague object representing the hash table.
+ * Opaque object representing the hash table.
  */
 struct l_hashmap {
 	l_hashmap_hash_func_t hash_func;
@@ -311,7 +296,7 @@ LIB_EXPORT bool l_hashmap_set_key_free_function(struct l_hashmap *hashmap,
  * @hashmap: hash table object
  * @destroy: destroy function
  *
- * Free hash table and call @destory on all remaining entries.
+ * Free hash table and call @destroy on all remaining entries.
  *
  * NOTE: While the destroy is in progress, the hashmap is assumed to be
  * invariant.  The behavior of adding or removing entries while a destroy

@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2015  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2015  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -338,9 +323,14 @@ static ssize_t operate_cipher(int sk, __u32 operation,
 
 		iov[0].iov_base = (void *) ad;
 		iov[0].iov_len = ad_len;
-		iov[1].iov_base = (void *) in;
-		iov[1].iov_len = in_len;
-		msg.msg_iovlen = 2;
+
+		msg.msg_iovlen = 1;
+
+		if (in) {
+			iov[1].iov_base = (void *) in;
+			iov[1].iov_len = in_len;
+			msg.msg_iovlen = 2;
+		}
 	} else {
 		iov[0].iov_base = (void *) in;
 		iov[0].iov_len = in_len;
@@ -740,8 +730,6 @@ LIB_EXPORT bool l_aead_cipher_is_supported(enum l_aead_cipher_type type)
 }
 
 /* ARC4 implementation copyright (c) 2001 Niels Möller */
-
-#define SWAP(a, b) do { uint8_t _t = a; a = b; b = _t; } while (0)
 
 static void arc4_set_key(uint8_t *S, const uint8_t *key, size_t key_length)
 {

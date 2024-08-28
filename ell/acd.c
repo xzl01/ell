@@ -1,21 +1,8 @@
 /*
- *  Embedded Linux library
+ * Embedded Linux library
+ * Copyright (C) 2020  Intel Corporation
  *
- *  Copyright (C) 2020  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -296,10 +283,10 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 				target_conflict ? "Target" : "Source",
 				NIPQUAD(acd->ip));
 
+		l_acd_stop(acd);
+
 		if (acd->event_func)
 			acd->event_func(L_ACD_EVENT_CONFLICT, acd->user_data);
-
-		l_acd_stop(acd);
 
 		break;
 	case ACD_STATE_ANNOUNCED:
@@ -339,7 +326,7 @@ static bool acd_read_handler(struct l_io *io, void *user_data)
 		/*
 		 * We still have an initial announcement to send, but rather
 		 * than wait for that (potentially 2 seconds) we can remove
-		 * the timeout, send annouce now, and still transition to the
+		 * the timeout, send announce now, and still transition to the
 		 * defending state.
 		 */
 		if (acd->timeout)
@@ -531,14 +518,14 @@ LIB_EXPORT void l_acd_destroy(struct l_acd *acd)
 
 LIB_EXPORT bool l_acd_set_debug(struct l_acd *acd,
 				l_acd_debug_cb_t function,
-				void *user_data, l_acd_destroy_func_t destory)
+				void *user_data, l_acd_destroy_func_t destroy)
 {
 	if (unlikely(!acd))
 		return false;
 
 	acd->debug_handler = function;
 	acd->debug_data = user_data;
-	acd->debug_destroy = destory;
+	acd->debug_destroy = destroy;
 
 	return true;
 }

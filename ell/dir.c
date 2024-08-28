@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2017  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2017  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -30,8 +15,10 @@
 #include <limits.h>
 #include <sys/inotify.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #include "private.h"
+#include "useful.h"
 #include "queue.h"
 #include "io.h"
 #include "dir.h"
@@ -350,4 +337,54 @@ done:
 		watch->destroy(watch->user_data);
 
 	l_free(watch);
+}
+
+/**
+ * l_dir_create:
+ * @abspath: Absolute path of the directory to create
+ *
+ * Attempts to create a directory tree given by @abspath.  @abspath must be
+ * an absolute path.
+ *
+ * Returns: 0 if successful, a negative errno otherwise
+ **/
+LIB_EXPORT int l_dir_create(const char *abspath)
+{
+	static const mode_t create_mode = S_IRUSR | S_IWUSR | S_IXUSR;
+	struct stat st;
+	_auto_(l_free) char *dir = NULL;
+	const char *prev, *next;
+	int err;
+
+	if (!abspath || abspath[0] != '/')
+		return -EINVAL;
+
+	err = stat(abspath, &st);
+	if (!err) {
+		/* File exists */
+		if (S_ISDIR(st.st_mode))
+			return 0;
+
+		return -ENOTDIR;
+	}
+
+	if (errno != ENOENT)
+		return -errno;
+
+	dir = l_malloc(strlen(abspath) + 1);
+	dir[0] = '\0';
+
+	for (prev = abspath; prev[0] && (next = strchrnul(prev + 1, '/'));
+								prev = next) {
+		/* Skip consecutive '/' characters */
+		if (next - prev == 1)
+			continue;
+
+		strncat(dir, prev, next - prev);
+
+		if (mkdir(dir, create_mode) == -1 && errno != EEXIST)
+			return -errno;
+	}
+
+	return 0;
 }

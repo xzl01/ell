@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2015  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2015  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -25,6 +10,9 @@
 #endif
 
 #include <assert.h>
+#include <limits.h>
+#include <stdio.h>
+#include <errno.h>
 
 #include <ell/ell.h>
 
@@ -163,6 +151,125 @@ static void test_in_set(const void *test_data)
 	assert(!L_IN_STRSET("a"));
 }
 
+static void test_safe_atoux(const void *test_data)
+{
+	uint32_t r;
+	uint16_t h;
+	uint8_t c;
+	char s[64];
+
+	assert(!l_safe_atou32("234233", &r) && r == 234233);
+	assert(!l_safe_atou32("0", &r) && r == 0);
+
+	assert(!l_safe_atox32("a34", &r) && r == 0xa34);
+	assert(!l_safe_atox32("0xa34", &r) && r == 0xa34);
+	assert(l_safe_atou32("a34", NULL) == -EINVAL);
+
+	sprintf(s, "%u", UINT_MAX);
+	assert(!l_safe_atou32(s, &r) && r == UINT_MAX);
+
+	sprintf(s, "%x", UINT_MAX);
+	assert(!l_safe_atox32(s, &r) && r == UINT_MAX);
+
+	assert(l_safe_atou32("", NULL) == -EINVAL);
+	assert(l_safe_atox32("", NULL) == -EINVAL);
+
+	sprintf(s, "%llu", ULLONG_MAX);
+	assert(l_safe_atou32(s, NULL) == -ERANGE);
+
+	sprintf(s, "%llx", ULLONG_MAX);
+	assert(l_safe_atox32(s, NULL) == -ERANGE);
+
+	assert(l_safe_atou32("    3", NULL) == -EINVAL);
+	assert(l_safe_atou32("+3434", NULL) == -EINVAL);
+	assert(l_safe_atou32("-3434", NULL) == -EINVAL);
+	assert(l_safe_atou32("00000", &r) == -EINVAL);
+	assert(!l_safe_atox32("0002", &r) && r == 0x2);
+	assert(!l_safe_atox32("0x02", &r) && r == 0x2);
+
+	assert(l_safe_atox32("+0x3434", NULL) == -EINVAL);
+	assert(l_safe_atox32("-0x3434", NULL) == -EINVAL);
+
+	assert(!l_safe_atox16("0xffff", &h) && h == 0xffff);
+	assert(!l_safe_atox8("0xff", &c) && c == 0xff);
+	assert(l_safe_atox8("0xffff", &c) == -ERANGE);
+}
+
+static void test_set_bit(const void *test_data)
+{
+	uint32_t bitmap[2] = { };
+	int one = 0;
+
+	L_BIT_SET(&bitmap[0], 0);
+	L_BIT_SET(bitmap, 1);
+	L_BIT_SET(bitmap, 2);
+	L_BIT_SET(bitmap, 3);
+
+	assert(bitmap[0] == 0x0f);
+	assert(bitmap[1] == 0);
+
+	L_BIT_SET(bitmap, 63);
+	L_BIT_SET(bitmap, 62);
+	L_BIT_SET(bitmap, 61);
+	L_BIT_SET(bitmap, 60);
+
+	assert(bitmap[0] == 0x0fU);
+	assert(bitmap[1] == 0xf0000000U);
+
+	L_BIT_SET(&one, 0);
+	assert(one == 1);
+}
+
+static void test_clear_bit(const void *test_data)
+{
+	uint32_t bitmap[2] = { 0xfU, 0xf0000000U };
+
+	L_BIT_CLEAR(&bitmap[0], 3);
+	L_BIT_CLEAR(bitmap, 63);
+
+	assert(bitmap[0] == 0x07U);
+	assert(bitmap[1] == 0x70000000U);
+}
+
+static void test_is_bit_set(const void *test_data)
+{
+	uint32_t bitmap[2] = { 0xfU, 0xf0000000U };
+	uint8_t one = 1;
+
+	assert(L_BIT_TEST(&bitmap[0], 0) == true);
+	assert(L_BIT_TEST(bitmap, 1) == true);
+	assert(L_BIT_TEST(bitmap, 2) == true);
+	assert(L_BIT_TEST(bitmap, 3) == true);
+	assert(L_BIT_TEST(bitmap, 4) == false);
+
+	assert(L_BIT_TEST(bitmap, 63) == true);
+	assert(L_BIT_TEST(bitmap, 55) == false);
+
+	assert(L_BIT_TEST(&one, 0) == true);
+	assert(L_BIT_TEST(&one, 1) == false);
+}
+
+static void test_set_bits(const void *test_data)
+{
+	uint16_t bitmap[4] = {};
+
+	L_BITS_SET(bitmap, 0, 1, 16, 32, 48);
+
+	assert(bitmap[0] == 0x3);
+	assert(bitmap[1] == 0x1);
+	assert(bitmap[2] == 0x1);
+	assert(bitmap[3] == 0x1);
+}
+
+static void test_clear_bits(const void *test_data)
+{
+	uint16_t bitmap[4] = { 0x3, 0x1, 0x1, 0x1 };
+
+	L_BITS_CLEAR(bitmap, 0, 1, 16, 32, 48);
+
+	assert(l_memeqzero(bitmap, sizeof(bitmap)));
+}
+
 int main(int argc, char *argv[])
 {
 	l_test_init(&argc, &argv);
@@ -177,6 +284,14 @@ int main(int argc, char *argv[])
 	l_test_add("l_strlcpy", test_strlcpy, NULL);
 
 	l_test_add("L_IN_SET", test_in_set, NULL);
+
+	l_test_add("l_safe_atoux", test_safe_atoux, NULL);
+
+	l_test_add("L_BIT_SET", test_set_bit, NULL);
+	l_test_add("L_BIT_CLEAR", test_clear_bit, NULL);
+	l_test_add("L_BIT_TEST", test_is_bit_set, NULL);
+	l_test_add("L_BITS_SET", test_set_bits, NULL);
+	l_test_add("L_BITS_CLEAR", test_clear_bits, NULL);
 
 	return l_test_run();
 }

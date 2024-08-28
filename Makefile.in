@@ -91,15 +91,22 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-noinst_PROGRAMS = $(am__EXEEXT_6) tools/certchain-verify$(EXEEXT) \
-	tools/genl-discover$(EXEEXT) tools/genl-watch$(EXEEXT) \
-	tools/genl-request$(EXEEXT) tools/gpio$(EXEEXT)
-@MAINTAINER_MODE_TRUE@am__append_1 = $(unit_tests) $(dbus_tests) \
-@MAINTAINER_MODE_TRUE@	$(cert_tests) $(examples)
-@GLIB_TRUE@am__append_2 = examples/glib-eventloop
-TESTS = $(am__EXEEXT_1) $(am__EXEEXT_7) $(am__EXEEXT_8)
-@DBUS_TESTS_TRUE@am__append_3 = $(dbus_tests)
-@CERT_TESTS_TRUE@am__append_4 = $(cert_tests)
+noinst_PROGRAMS = $(am__EXEEXT_4) $(am__EXEEXT_5) $(am__EXEEXT_6) \
+	$(am__EXEEXT_7)
+@MAINTAINER_MODE_TRUE@@TESTS_TRUE@am__append_1 = $(unit_tests) $(dbus_tests) $(cert_tests)
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@am__append_2 = examples/dbus-service examples/https-client-test \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@			examples/https-server-test examples/dbus-client \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@			examples/dhcp-client examples/dhcp6-client \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@			examples/dhcp-server examples/acd-client \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@			examples/netconfig-test
+
+@EXAMPLES_TRUE@@GLIB_TRUE@@MAINTAINER_MODE_TRUE@am__append_3 = examples/glib-eventloop
+@TOOLS_TRUE@am__append_4 = tools/certchain-verify tools/genl-discover \
+@TOOLS_TRUE@		   tools/genl-watch tools/genl-request tools/gpio
+
+TESTS = $(am__EXEEXT_1) $(am__EXEEXT_8) $(am__EXEEXT_9)
+@DBUS_TESTS_TRUE@am__append_5 = $(dbus_tests)
+@CERT_TESTS_TRUE@am__append_6 = $(cert_tests)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/build-aux/libtool.m4 \
@@ -132,7 +139,9 @@ am__EXEEXT_1 = unit/test-unit$(EXEEXT) unit/test-queue$(EXEEXT) \
 	unit/test-dhcp$(EXEEXT) unit/test-dhcp6$(EXEEXT) \
 	unit/test-dir-watch$(EXEEXT) unit/test-ecc$(EXEEXT) \
 	unit/test-ecdh$(EXEEXT) unit/test-time$(EXEEXT) \
-	unit/test-path$(EXEEXT) unit/test-net$(EXEEXT)
+	unit/test-path$(EXEEXT) unit/test-net$(EXEEXT) \
+	unit/test-sysctl$(EXEEXT) unit/test-minheap$(EXEEXT) \
+	unit/test-notifylist$(EXEEXT)
 am__EXEEXT_2 = unit/test-hwdb$(EXEEXT) unit/test-dbus$(EXEEXT) \
 	unit/test-dbus-util$(EXEEXT) unit/test-dbus-message$(EXEEXT) \
 	unit/test-dbus-message-fds$(EXEEXT) \
@@ -142,16 +151,23 @@ am__EXEEXT_2 = unit/test-hwdb$(EXEEXT) unit/test-dbus$(EXEEXT) \
 	unit/test-gvariant-message$(EXEEXT)
 am__EXEEXT_3 = unit/test-pem$(EXEEXT) unit/test-tls$(EXEEXT) \
 	unit/test-key$(EXEEXT)
-@GLIB_TRUE@am__EXEEXT_4 = examples/glib-eventloop$(EXEEXT)
-am__EXEEXT_5 = examples/dbus-service$(EXEEXT) \
-	examples/https-client-test$(EXEEXT) \
-	examples/https-server-test$(EXEEXT) \
-	examples/dbus-client$(EXEEXT) examples/dhcp-client$(EXEEXT) \
-	examples/dhcp6-client$(EXEEXT) examples/dhcp-server$(EXEEXT) \
-	examples/acd-client$(EXEEXT) examples/netconfig-test$(EXEEXT) \
-	$(am__EXEEXT_4)
-@MAINTAINER_MODE_TRUE@am__EXEEXT_6 = $(am__EXEEXT_1) $(am__EXEEXT_2) \
-@MAINTAINER_MODE_TRUE@	$(am__EXEEXT_3) $(am__EXEEXT_5)
+@MAINTAINER_MODE_TRUE@@TESTS_TRUE@am__EXEEXT_4 = $(am__EXEEXT_1) \
+@MAINTAINER_MODE_TRUE@@TESTS_TRUE@	$(am__EXEEXT_2) \
+@MAINTAINER_MODE_TRUE@@TESTS_TRUE@	$(am__EXEEXT_3)
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@am__EXEEXT_5 = examples/dbus-service$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/https-client-test$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/https-server-test$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/dbus-client$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/dhcp-client$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/dhcp6-client$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/dhcp-server$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/acd-client$(EXEEXT) \
+@EXAMPLES_TRUE@@MAINTAINER_MODE_TRUE@	examples/netconfig-test$(EXEEXT)
+@EXAMPLES_TRUE@@GLIB_TRUE@@MAINTAINER_MODE_TRUE@am__EXEEXT_6 = examples/glib-eventloop$(EXEEXT)
+@TOOLS_TRUE@am__EXEEXT_7 = tools/certchain-verify$(EXEEXT) \
+@TOOLS_TRUE@	tools/genl-discover$(EXEEXT) \
+@TOOLS_TRUE@	tools/genl-watch$(EXEEXT) \
+@TOOLS_TRUE@	tools/genl-request$(EXEEXT) tools/gpio$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
@@ -203,7 +219,8 @@ am__objects_2 = $(am__objects_1) $(am__objects_1) ell/util.lo \
 	ell/dhcp-util.lo ell/dhcp-server.lo ell/cert.lo \
 	ell/cert-crypto.lo ell/ecc-external.lo ell/ecc.lo ell/ecdh.lo \
 	ell/time.lo ell/gpio.lo ell/path.lo ell/icmp6.lo ell/acd.lo \
-	ell/tester.lo ell/netconfig.lo
+	ell/tester.lo ell/netconfig.lo ell/sysctl.lo ell/minheap.lo \
+	ell/notifylist.lo
 am_ell_libell_private_la_OBJECTS = $(am__objects_2)
 ell_libell_private_la_OBJECTS = $(am_ell_libell_private_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -228,7 +245,8 @@ am_ell_libell_la_OBJECTS = $(am__objects_1) $(am__objects_1) \
 	ell/dhcp-util.lo ell/dhcp-server.lo ell/cert.lo \
 	ell/cert-crypto.lo ell/ecc-external.lo ell/ecc.lo ell/ecdh.lo \
 	ell/time.lo ell/gpio.lo ell/path.lo ell/icmp6.lo ell/acd.lo \
-	ell/tester.lo ell/netconfig.lo
+	ell/tester.lo ell/netconfig.lo ell/sysctl.lo ell/minheap.lo \
+	ell/notifylist.lo
 ell_libell_la_OBJECTS = $(am_ell_libell_la_OBJECTS)
 ell_libell_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -363,12 +381,18 @@ unit_test_key_OBJECTS = unit/test-key.$(OBJEXT)
 unit_test_main_SOURCES = unit/test-main.c
 unit_test_main_OBJECTS = unit/test-main.$(OBJEXT)
 unit_test_main_DEPENDENCIES = ell/libell-private.la
+unit_test_minheap_SOURCES = unit/test-minheap.c
+unit_test_minheap_OBJECTS = unit/test-minheap.$(OBJEXT)
+unit_test_minheap_DEPENDENCIES = ell/libell-private.la
 unit_test_net_SOURCES = unit/test-net.c
 unit_test_net_OBJECTS = unit/test-net.$(OBJEXT)
 unit_test_net_DEPENDENCIES = ell/libell-private.la
 unit_test_netlink_SOURCES = unit/test-netlink.c
 unit_test_netlink_OBJECTS = unit/test-netlink.$(OBJEXT)
 unit_test_netlink_DEPENDENCIES = ell/libell-private.la
+unit_test_notifylist_SOURCES = unit/test-notifylist.c
+unit_test_notifylist_OBJECTS = unit/test-notifylist.$(OBJEXT)
+unit_test_notifylist_DEPENDENCIES = ell/libell-private.la
 unit_test_path_SOURCES = unit/test-path.c
 unit_test_path_OBJECTS = unit/test-path.$(OBJEXT)
 unit_test_path_DEPENDENCIES = ell/libell-private.la
@@ -398,6 +422,9 @@ unit_test_siphash_DEPENDENCIES = ell/libell-private.la
 unit_test_string_SOURCES = unit/test-string.c
 unit_test_string_OBJECTS = unit/test-string.$(OBJEXT)
 unit_test_string_DEPENDENCIES = ell/libell-private.la
+unit_test_sysctl_SOURCES = unit/test-sysctl.c
+unit_test_sysctl_OBJECTS = unit/test-sysctl.$(OBJEXT)
+unit_test_sysctl_DEPENDENCIES = ell/libell-private.la
 unit_test_time_SOURCES = unit/test-time.c
 unit_test_time_OBJECTS = unit/test-time.$(OBJEXT)
 unit_test_time_DEPENDENCIES = ell/libell-private.la
@@ -453,20 +480,21 @@ am__depfiles_remade = ell/$(DEPDIR)/acd.Plo ell/$(DEPDIR)/base64.Plo \
 	ell/$(DEPDIR)/icmp6.Plo ell/$(DEPDIR)/idle.Plo \
 	ell/$(DEPDIR)/io.Plo ell/$(DEPDIR)/key.Plo \
 	ell/$(DEPDIR)/log.Plo ell/$(DEPDIR)/main.Plo \
-	ell/$(DEPDIR)/net.Plo ell/$(DEPDIR)/netconfig.Plo \
-	ell/$(DEPDIR)/netlink.Plo ell/$(DEPDIR)/path.Plo \
+	ell/$(DEPDIR)/minheap.Plo ell/$(DEPDIR)/net.Plo \
+	ell/$(DEPDIR)/netconfig.Plo ell/$(DEPDIR)/netlink.Plo \
+	ell/$(DEPDIR)/notifylist.Plo ell/$(DEPDIR)/path.Plo \
 	ell/$(DEPDIR)/pem.Plo ell/$(DEPDIR)/queue.Plo \
 	ell/$(DEPDIR)/random.Plo ell/$(DEPDIR)/ringbuf.Plo \
 	ell/$(DEPDIR)/rtnl.Plo ell/$(DEPDIR)/settings.Plo \
 	ell/$(DEPDIR)/signal.Plo ell/$(DEPDIR)/siphash.Plo \
 	ell/$(DEPDIR)/string.Plo ell/$(DEPDIR)/strv.Plo \
-	ell/$(DEPDIR)/test.Plo ell/$(DEPDIR)/tester.Plo \
-	ell/$(DEPDIR)/time.Plo ell/$(DEPDIR)/timeout.Plo \
-	ell/$(DEPDIR)/tls-extensions.Plo ell/$(DEPDIR)/tls-record.Plo \
-	ell/$(DEPDIR)/tls-suites.Plo ell/$(DEPDIR)/tls.Plo \
-	ell/$(DEPDIR)/uintset.Plo ell/$(DEPDIR)/utf8.Plo \
-	ell/$(DEPDIR)/util.Plo ell/$(DEPDIR)/uuid.Plo \
-	examples/$(DEPDIR)/acd-client.Po \
+	ell/$(DEPDIR)/sysctl.Plo ell/$(DEPDIR)/test.Plo \
+	ell/$(DEPDIR)/tester.Plo ell/$(DEPDIR)/time.Plo \
+	ell/$(DEPDIR)/timeout.Plo ell/$(DEPDIR)/tls-extensions.Plo \
+	ell/$(DEPDIR)/tls-record.Plo ell/$(DEPDIR)/tls-suites.Plo \
+	ell/$(DEPDIR)/tls.Plo ell/$(DEPDIR)/uintset.Plo \
+	ell/$(DEPDIR)/utf8.Plo ell/$(DEPDIR)/util.Plo \
+	ell/$(DEPDIR)/uuid.Plo examples/$(DEPDIR)/acd-client.Po \
 	examples/$(DEPDIR)/dbus-client.Po \
 	examples/$(DEPDIR)/dbus-service.Po \
 	examples/$(DEPDIR)/dhcp-client.Po \
@@ -495,16 +523,18 @@ am__depfiles_remade = ell/$(DEPDIR)/acd.Plo ell/$(DEPDIR)/base64.Plo \
 	unit/$(DEPDIR)/test-gvariant-util.Po \
 	unit/$(DEPDIR)/test-hashmap.Po unit/$(DEPDIR)/test-hwdb.Po \
 	unit/$(DEPDIR)/test-io.Po unit/$(DEPDIR)/test-key.Po \
-	unit/$(DEPDIR)/test-main.Po unit/$(DEPDIR)/test-net.Po \
-	unit/$(DEPDIR)/test-netlink.Po unit/$(DEPDIR)/test-path.Po \
+	unit/$(DEPDIR)/test-main.Po unit/$(DEPDIR)/test-minheap.Po \
+	unit/$(DEPDIR)/test-net.Po unit/$(DEPDIR)/test-netlink.Po \
+	unit/$(DEPDIR)/test-notifylist.Po unit/$(DEPDIR)/test-path.Po \
 	unit/$(DEPDIR)/test-pbkdf2.Po unit/$(DEPDIR)/test-pem.Po \
 	unit/$(DEPDIR)/test-queue.Po unit/$(DEPDIR)/test-random.Po \
 	unit/$(DEPDIR)/test-ringbuf.Po unit/$(DEPDIR)/test-rtnl.Po \
 	unit/$(DEPDIR)/test-settings.Po unit/$(DEPDIR)/test-siphash.Po \
-	unit/$(DEPDIR)/test-string.Po unit/$(DEPDIR)/test-time.Po \
-	unit/$(DEPDIR)/test-tls.Po unit/$(DEPDIR)/test-uintset.Po \
-	unit/$(DEPDIR)/test-unit.Po unit/$(DEPDIR)/test-utf8.Po \
-	unit/$(DEPDIR)/test-util.Po unit/$(DEPDIR)/test-uuid.Po
+	unit/$(DEPDIR)/test-string.Po unit/$(DEPDIR)/test-sysctl.Po \
+	unit/$(DEPDIR)/test-time.Po unit/$(DEPDIR)/test-tls.Po \
+	unit/$(DEPDIR)/test-uintset.Po unit/$(DEPDIR)/test-unit.Po \
+	unit/$(DEPDIR)/test-utf8.Po unit/$(DEPDIR)/test-util.Po \
+	unit/$(DEPDIR)/test-uuid.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -542,11 +572,12 @@ SOURCES = $(ell_libell_private_la_SOURCES) $(ell_libell_la_SOURCES) \
 	unit/test-endian.c unit/test-genl-msg.c \
 	unit/test-gvariant-message.c unit/test-gvariant-util.c \
 	unit/test-hashmap.c unit/test-hwdb.c unit/test-io.c \
-	unit/test-key.c unit/test-main.c unit/test-net.c \
-	unit/test-netlink.c unit/test-path.c unit/test-pbkdf2.c \
-	unit/test-pem.c unit/test-queue.c unit/test-random.c \
-	unit/test-ringbuf.c unit/test-rtnl.c unit/test-settings.c \
-	unit/test-siphash.c unit/test-string.c unit/test-time.c \
+	unit/test-key.c unit/test-main.c unit/test-minheap.c \
+	unit/test-net.c unit/test-netlink.c unit/test-notifylist.c \
+	unit/test-path.c unit/test-pbkdf2.c unit/test-pem.c \
+	unit/test-queue.c unit/test-random.c unit/test-ringbuf.c \
+	unit/test-rtnl.c unit/test-settings.c unit/test-siphash.c \
+	unit/test-string.c unit/test-sysctl.c unit/test-time.c \
 	unit/test-tls.c unit/test-uintset.c unit/test-unit.c \
 	unit/test-utf8.c unit/test-util.c unit/test-uuid.c
 DIST_SOURCES = $(ell_libell_private_la_SOURCES) \
@@ -567,11 +598,12 @@ DIST_SOURCES = $(ell_libell_private_la_SOURCES) \
 	unit/test-endian.c unit/test-genl-msg.c \
 	unit/test-gvariant-message.c unit/test-gvariant-util.c \
 	unit/test-hashmap.c unit/test-hwdb.c unit/test-io.c \
-	unit/test-key.c unit/test-main.c unit/test-net.c \
-	unit/test-netlink.c unit/test-path.c unit/test-pbkdf2.c \
-	unit/test-pem.c unit/test-queue.c unit/test-random.c \
-	unit/test-ringbuf.c unit/test-rtnl.c unit/test-settings.c \
-	unit/test-siphash.c unit/test-string.c unit/test-time.c \
+	unit/test-key.c unit/test-main.c unit/test-minheap.c \
+	unit/test-net.c unit/test-netlink.c unit/test-notifylist.c \
+	unit/test-path.c unit/test-pbkdf2.c unit/test-pem.c \
+	unit/test-queue.c unit/test-random.c unit/test-ringbuf.c \
+	unit/test-rtnl.c unit/test-settings.c unit/test-siphash.c \
+	unit/test-string.c unit/test-sysctl.c unit/test-time.c \
 	unit/test-tls.c unit/test-uintset.c unit/test-unit.c \
 	unit/test-utf8.c unit/test-util.c unit/test-uuid.c
 am__can_run_installinfo = \
@@ -757,8 +789,8 @@ am__set_TESTS_bases = \
   bases=`echo $$bases`
 AM_TESTSUITE_SUMMARY_HEADER = ' for $(PACKAGE_STRING)'
 RECHECK_LOGS = $(TEST_LOGS)
-@DBUS_TESTS_TRUE@am__EXEEXT_7 = $(am__EXEEXT_2)
-@CERT_TESTS_TRUE@am__EXEEXT_8 = $(am__EXEEXT_3)
+@DBUS_TESTS_TRUE@am__EXEEXT_8 = $(am__EXEEXT_2)
+@CERT_TESTS_TRUE@am__EXEEXT_9 = $(am__EXEEXT_3)
 TEST_SUITE_LOG = test-suite.log
 TEST_EXTENSIONS = @EXEEXT@ .test
 LOG_DRIVER = $(SHELL) $(top_srcdir)/build-aux/test-driver
@@ -997,7 +1029,10 @@ pkginclude_HEADERS = ell/ell.h \
 			ell/acd.h \
 			ell/tester.h \
 			ell/cleanup.h \
-			ell/netconfig.h
+			ell/netconfig.h \
+			ell/sysctl.h \
+			ell/minheap.h \
+			ell/notifylist.h
 
 lib_LTLIBRARIES = ell/libell.la
 ell_libell_la_SOURCES = $(linux_headers) \
@@ -1084,7 +1119,10 @@ ell_libell_la_SOURCES = $(linux_headers) \
 			ell/icmp6-private.h \
 			ell/acd.c \
 			ell/tester.c \
-			ell/netconfig.c
+			ell/netconfig.c \
+			ell/sysctl.c \
+			ell/minheap.c \
+			ell/notifylist.c
 
 ell_libell_la_LDFLAGS = -Wl,--no-undefined \
 			-Wl,--version-script=$(top_srcdir)/ell/ell.sym \
@@ -1127,7 +1165,10 @@ unit_tests = unit/test-unit \
 			unit/test-ecdh \
 			unit/test-time \
 			unit/test-path \
-			unit/test-net
+			unit/test-net \
+			unit/test-sysctl \
+			unit/test-minheap \
+			unit/test-notifylist
 
 dbus_tests = unit/test-hwdb \
 			unit/test-dbus \
@@ -1227,12 +1268,10 @@ unit_test_ecdh_LDFLAGS = -Wl,-wrap,l_getrandom
 unit_test_time_LDADD = ell/libell-private.la
 unit_test_path_LDADD = ell/libell-private.la
 unit_test_net_LDADD = ell/libell-private.la
+unit_test_sysctl_LDADD = ell/libell-private.la
+unit_test_minheap_LDADD = ell/libell-private.la
+unit_test_notifylist_LDADD = ell/libell-private.la
 unit_test_data_files = unit/settings.test unit/dbus.conf
-examples = examples/dbus-service examples/https-client-test \
-	examples/https-server-test examples/dbus-client \
-	examples/dhcp-client examples/dhcp6-client \
-	examples/dhcp-server examples/acd-client \
-	examples/netconfig-test $(am__append_2)
 examples_dbus_service_LDADD = ell/libell-private.la
 examples_https_client_test_LDADD = ell/libell-private.la
 examples_https_server_test_LDADD = ell/libell-private.la
@@ -1263,7 +1302,7 @@ MAINTAINERCLEANFILES = Makefile.in configure config.h.in aclocal.m4
 @OPENSSL_PROVIDER_TRUE@openssl_legacy = -provider legacy -provider default
 true_redirect_openssl = 2>&1
 false_redirect_openssl = 2>/dev/null
-@MAINTAINER_MODE_TRUE@BUILT_SOURCES = unit/key-plaintext.h unit/key-ciphertext.h unit/key-signature.h
+@MAINTAINER_MODE_TRUE@@TESTS_TRUE@BUILT_SOURCES = unit/key-plaintext.h unit/key-ciphertext.h unit/key-signature.h
 all: $(BUILT_SOURCES) config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -1448,6 +1487,9 @@ ell/icmp6.lo: ell/$(am__dirstamp) ell/$(DEPDIR)/$(am__dirstamp)
 ell/acd.lo: ell/$(am__dirstamp) ell/$(DEPDIR)/$(am__dirstamp)
 ell/tester.lo: ell/$(am__dirstamp) ell/$(DEPDIR)/$(am__dirstamp)
 ell/netconfig.lo: ell/$(am__dirstamp) ell/$(DEPDIR)/$(am__dirstamp)
+ell/sysctl.lo: ell/$(am__dirstamp) ell/$(DEPDIR)/$(am__dirstamp)
+ell/minheap.lo: ell/$(am__dirstamp) ell/$(DEPDIR)/$(am__dirstamp)
+ell/notifylist.lo: ell/$(am__dirstamp) ell/$(DEPDIR)/$(am__dirstamp)
 
 ell/libell-private.la: $(ell_libell_private_la_OBJECTS) $(ell_libell_private_la_DEPENDENCIES) $(EXTRA_ell_libell_private_la_DEPENDENCIES) ell/$(am__dirstamp)
 	$(AM_V_CCLD)$(LINK)  $(ell_libell_private_la_OBJECTS) $(ell_libell_private_la_LIBADD) $(LIBS)
@@ -1706,6 +1748,12 @@ unit/test-main.$(OBJEXT): unit/$(am__dirstamp) \
 unit/test-main$(EXEEXT): $(unit_test_main_OBJECTS) $(unit_test_main_DEPENDENCIES) $(EXTRA_unit_test_main_DEPENDENCIES) unit/$(am__dirstamp)
 	@rm -f unit/test-main$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(unit_test_main_OBJECTS) $(unit_test_main_LDADD) $(LIBS)
+unit/test-minheap.$(OBJEXT): unit/$(am__dirstamp) \
+	unit/$(DEPDIR)/$(am__dirstamp)
+
+unit/test-minheap$(EXEEXT): $(unit_test_minheap_OBJECTS) $(unit_test_minheap_DEPENDENCIES) $(EXTRA_unit_test_minheap_DEPENDENCIES) unit/$(am__dirstamp)
+	@rm -f unit/test-minheap$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(unit_test_minheap_OBJECTS) $(unit_test_minheap_LDADD) $(LIBS)
 unit/test-net.$(OBJEXT): unit/$(am__dirstamp) \
 	unit/$(DEPDIR)/$(am__dirstamp)
 
@@ -1718,6 +1766,12 @@ unit/test-netlink.$(OBJEXT): unit/$(am__dirstamp) \
 unit/test-netlink$(EXEEXT): $(unit_test_netlink_OBJECTS) $(unit_test_netlink_DEPENDENCIES) $(EXTRA_unit_test_netlink_DEPENDENCIES) unit/$(am__dirstamp)
 	@rm -f unit/test-netlink$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(unit_test_netlink_OBJECTS) $(unit_test_netlink_LDADD) $(LIBS)
+unit/test-notifylist.$(OBJEXT): unit/$(am__dirstamp) \
+	unit/$(DEPDIR)/$(am__dirstamp)
+
+unit/test-notifylist$(EXEEXT): $(unit_test_notifylist_OBJECTS) $(unit_test_notifylist_DEPENDENCIES) $(EXTRA_unit_test_notifylist_DEPENDENCIES) unit/$(am__dirstamp)
+	@rm -f unit/test-notifylist$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(unit_test_notifylist_OBJECTS) $(unit_test_notifylist_LDADD) $(LIBS)
 unit/test-path.$(OBJEXT): unit/$(am__dirstamp) \
 	unit/$(DEPDIR)/$(am__dirstamp)
 
@@ -1778,6 +1832,12 @@ unit/test-string.$(OBJEXT): unit/$(am__dirstamp) \
 unit/test-string$(EXEEXT): $(unit_test_string_OBJECTS) $(unit_test_string_DEPENDENCIES) $(EXTRA_unit_test_string_DEPENDENCIES) unit/$(am__dirstamp)
 	@rm -f unit/test-string$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(unit_test_string_OBJECTS) $(unit_test_string_LDADD) $(LIBS)
+unit/test-sysctl.$(OBJEXT): unit/$(am__dirstamp) \
+	unit/$(DEPDIR)/$(am__dirstamp)
+
+unit/test-sysctl$(EXEEXT): $(unit_test_sysctl_OBJECTS) $(unit_test_sysctl_DEPENDENCIES) $(EXTRA_unit_test_sysctl_DEPENDENCIES) unit/$(am__dirstamp)
+	@rm -f unit/test-sysctl$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(unit_test_sysctl_OBJECTS) $(unit_test_sysctl_LDADD) $(LIBS)
 unit/test-time.$(OBJEXT): unit/$(am__dirstamp) \
 	unit/$(DEPDIR)/$(am__dirstamp)
 
@@ -1869,9 +1929,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/key.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/log.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/main.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/minheap.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/net.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/netconfig.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/netlink.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/notifylist.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/path.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/pem.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/queue.Plo@am__quote@ # am--include-marker
@@ -1883,6 +1945,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/siphash.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/string.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/strv.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/sysctl.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/test.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/tester.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ell/$(DEPDIR)/time.Plo@am__quote@ # am--include-marker
@@ -1934,8 +1997,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-io.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-key.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-main.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-minheap.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-net.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-netlink.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-notifylist.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-path.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-pbkdf2.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-pem.Po@am__quote@ # am--include-marker
@@ -1946,6 +2011,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-settings.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-siphash.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-string.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-sysctl.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-time.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-tls.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@unit/$(DEPDIR)/test-uintset.Po@am__quote@ # am--include-marker
@@ -2463,6 +2529,27 @@ unit/test-net.log: unit/test-net$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+unit/test-sysctl.log: unit/test-sysctl$(EXEEXT)
+	@p='unit/test-sysctl$(EXEEXT)'; \
+	b='unit/test-sysctl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+unit/test-minheap.log: unit/test-minheap$(EXEEXT)
+	@p='unit/test-minheap$(EXEEXT)'; \
+	b='unit/test-minheap'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+unit/test-notifylist.log: unit/test-notifylist$(EXEEXT)
+	@p='unit/test-notifylist$(EXEEXT)'; \
+	b='unit/test-notifylist'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 unit/test-hwdb.log: unit/test-hwdb$(EXEEXT)
 	@p='unit/test-hwdb$(EXEEXT)'; \
 	b='unit/test-hwdb'; \
@@ -2740,6 +2827,7 @@ distcleancheck: distclean
 	       $(distcleancheck_listfiles) ; \
 	       exit 1; } >&2
 @MAINTAINER_MODE_FALSE@check-local:
+@TESTS_FALSE@check-local:
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) check-TESTS check-local
 check: $(BUILT_SOURCES)
@@ -2840,9 +2928,11 @@ distclean: distclean-am
 	-rm -f ell/$(DEPDIR)/key.Plo
 	-rm -f ell/$(DEPDIR)/log.Plo
 	-rm -f ell/$(DEPDIR)/main.Plo
+	-rm -f ell/$(DEPDIR)/minheap.Plo
 	-rm -f ell/$(DEPDIR)/net.Plo
 	-rm -f ell/$(DEPDIR)/netconfig.Plo
 	-rm -f ell/$(DEPDIR)/netlink.Plo
+	-rm -f ell/$(DEPDIR)/notifylist.Plo
 	-rm -f ell/$(DEPDIR)/path.Plo
 	-rm -f ell/$(DEPDIR)/pem.Plo
 	-rm -f ell/$(DEPDIR)/queue.Plo
@@ -2854,6 +2944,7 @@ distclean: distclean-am
 	-rm -f ell/$(DEPDIR)/siphash.Plo
 	-rm -f ell/$(DEPDIR)/string.Plo
 	-rm -f ell/$(DEPDIR)/strv.Plo
+	-rm -f ell/$(DEPDIR)/sysctl.Plo
 	-rm -f ell/$(DEPDIR)/test.Plo
 	-rm -f ell/$(DEPDIR)/tester.Plo
 	-rm -f ell/$(DEPDIR)/time.Plo
@@ -2905,8 +2996,10 @@ distclean: distclean-am
 	-rm -f unit/$(DEPDIR)/test-io.Po
 	-rm -f unit/$(DEPDIR)/test-key.Po
 	-rm -f unit/$(DEPDIR)/test-main.Po
+	-rm -f unit/$(DEPDIR)/test-minheap.Po
 	-rm -f unit/$(DEPDIR)/test-net.Po
 	-rm -f unit/$(DEPDIR)/test-netlink.Po
+	-rm -f unit/$(DEPDIR)/test-notifylist.Po
 	-rm -f unit/$(DEPDIR)/test-path.Po
 	-rm -f unit/$(DEPDIR)/test-pbkdf2.Po
 	-rm -f unit/$(DEPDIR)/test-pem.Po
@@ -2917,6 +3010,7 @@ distclean: distclean-am
 	-rm -f unit/$(DEPDIR)/test-settings.Po
 	-rm -f unit/$(DEPDIR)/test-siphash.Po
 	-rm -f unit/$(DEPDIR)/test-string.Po
+	-rm -f unit/$(DEPDIR)/test-sysctl.Po
 	-rm -f unit/$(DEPDIR)/test-time.Po
 	-rm -f unit/$(DEPDIR)/test-tls.Po
 	-rm -f unit/$(DEPDIR)/test-uintset.Po
@@ -3008,9 +3102,11 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ell/$(DEPDIR)/key.Plo
 	-rm -f ell/$(DEPDIR)/log.Plo
 	-rm -f ell/$(DEPDIR)/main.Plo
+	-rm -f ell/$(DEPDIR)/minheap.Plo
 	-rm -f ell/$(DEPDIR)/net.Plo
 	-rm -f ell/$(DEPDIR)/netconfig.Plo
 	-rm -f ell/$(DEPDIR)/netlink.Plo
+	-rm -f ell/$(DEPDIR)/notifylist.Plo
 	-rm -f ell/$(DEPDIR)/path.Plo
 	-rm -f ell/$(DEPDIR)/pem.Plo
 	-rm -f ell/$(DEPDIR)/queue.Plo
@@ -3022,6 +3118,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ell/$(DEPDIR)/siphash.Plo
 	-rm -f ell/$(DEPDIR)/string.Plo
 	-rm -f ell/$(DEPDIR)/strv.Plo
+	-rm -f ell/$(DEPDIR)/sysctl.Plo
 	-rm -f ell/$(DEPDIR)/test.Plo
 	-rm -f ell/$(DEPDIR)/tester.Plo
 	-rm -f ell/$(DEPDIR)/time.Plo
@@ -3073,8 +3170,10 @@ maintainer-clean: maintainer-clean-am
 	-rm -f unit/$(DEPDIR)/test-io.Po
 	-rm -f unit/$(DEPDIR)/test-key.Po
 	-rm -f unit/$(DEPDIR)/test-main.Po
+	-rm -f unit/$(DEPDIR)/test-minheap.Po
 	-rm -f unit/$(DEPDIR)/test-net.Po
 	-rm -f unit/$(DEPDIR)/test-netlink.Po
+	-rm -f unit/$(DEPDIR)/test-notifylist.Po
 	-rm -f unit/$(DEPDIR)/test-path.Po
 	-rm -f unit/$(DEPDIR)/test-pbkdf2.Po
 	-rm -f unit/$(DEPDIR)/test-pem.Po
@@ -3085,6 +3184,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f unit/$(DEPDIR)/test-settings.Po
 	-rm -f unit/$(DEPDIR)/test-siphash.Po
 	-rm -f unit/$(DEPDIR)/test-string.Po
+	-rm -f unit/$(DEPDIR)/test-sysctl.Po
 	-rm -f unit/$(DEPDIR)/test-time.Po
 	-rm -f unit/$(DEPDIR)/test-tls.Po
 	-rm -f unit/$(DEPDIR)/test-uintset.Po
@@ -3399,7 +3499,7 @@ unit/key-signature.dat: unit/plaintext.txt unit/cert-client-key-pkcs1.pem
 unit/key-signature.h: unit/key-signature.dat
 	$(AM_V_GEN)xxd -i < $< > $@
 
-@MAINTAINER_MODE_TRUE@check-local: $(cert_checks)
+@MAINTAINER_MODE_TRUE@@TESTS_TRUE@check-local: $(cert_checks)
 
 clean-local:
 	-rm -f unit/ec-cert*.pem unit/ec-cert-*.csr unit/cert-*.crt \

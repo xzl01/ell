@@ -25,6 +25,10 @@ global:
 	l_util_get_debugfs_path;
 	l_memeq;
 	l_secure_memeq;
+	l_safe_atox8;
+	l_safe_atox16;
+	l_safe_atox32;
+	l_safe_atou32;
 	/* test */
 	l_test_init;
 	l_test_run;
@@ -45,6 +49,8 @@ global:
 	l_strv_eq;
 	/* utf8 */
 	l_ascii_table;
+	l_ascii_strdown;
+	l_ascii_strup;
 	l_utf8_get_codepoint;
 	l_utf8_validate;
 	l_utf8_strlen;
@@ -251,6 +257,7 @@ global:
 	l_dhcp_client_set_rtnl;
 	l_dhcp_client_set_hostname;
 	l_dhcp_client_get_lease;
+	l_dhcp_client_set_max_attempts;
 	l_dhcp_client_start;
 	l_dhcp_client_stop;
 	l_dhcp_client_set_event_handler;
@@ -302,10 +309,12 @@ global:
 	l_dhcp6_lease_get_preferred_lifetime;
 	l_dhcp6_lease_get_start_time;
 	/* dir */
+	l_dir_create;
 	l_dir_watch_new;
 	l_dir_watch_destroy;
 	/* file */
 	l_file_get_contents;
+	l_file_set_contents;
 	/* genl */
 	l_genl_new;
 	l_genl_ref;
@@ -425,6 +434,7 @@ global:
 	l_netlink_unregister;
 	l_netlink_set_debug;
 	/* path */
+	l_basename;
 	l_path_find;
 	l_path_get_mtime;
 	l_path_next;
@@ -589,19 +599,23 @@ global:
 	l_ecc_point_get_data;
 	l_ecc_point_inverse;
 	l_ecc_point_multiply;
+	l_ecc_point_multiply_g;
 	l_ecc_point_new;
 	l_ecc_point_from_sswu;
 	l_ecc_point_clone;
 	l_ecc_point_get_curve;
 	l_ecc_points_are_equal;
+	l_ecc_point_is_infinity;
 	l_ecc_scalar_add;
 	l_ecc_scalar_free;
 	l_ecc_scalar_get_data;
 	l_ecc_scalar_legendre;
 	l_ecc_scalar_multiply;
 	l_ecc_scalar_new;
+	l_ecc_scalar_clone;
 	l_ecc_scalar_new_random;
 	l_ecc_scalar_new_modp;
+	l_ecc_scalar_new_modn;
 	l_ecc_scalar_new_reduced_1_to_n;
 	l_ecc_scalar_sum_x;
 	l_ecc_scalars_are_equal;
@@ -771,6 +785,18 @@ global:
 	l_netconfig_get_routes;
 	l_netconfig_get_dns_list;
 	l_netconfig_get_domain_names;
+	/* sysctl */
+	l_sysctl_get_u32;
+	l_sysctl_set_u32;
+	l_sysctl_get_char;
+	l_sysctl_set_char;
+	/* notifylist */
+	l_notifylist_new;
+	l_notifylist_free;
+	l_notifylist_add;
+	l_notifylist_remove;
+	l_notifylist_notify;
+	l_notifylist_notify_matches;
 local:
 	*;
 };

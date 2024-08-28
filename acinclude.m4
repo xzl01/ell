@@ -49,21 +49,29 @@ AC_DEFUN([AC_PROG_CC_UBSAN], [
 AC_DEFUN([COMPILER_FLAGS], [
 	if (test "${CFLAGS}" = ""); then
 		CFLAGS="-Wall -O2 -fsigned-char -fno-exceptions"
-		CFLAGS+=" -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2"
+		CFLAGS="$CFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2"
 	fi
 	if (test "$USE_MAINTAINER_MODE" = "yes"); then
-		CFLAGS+=" -Werror -Wextra"
-		CFLAGS+=" -Wno-unused-parameter"
-		CFLAGS+=" -Wno-missing-field-initializers"
-		CFLAGS+=" -Wdeclaration-after-statement"
-		CFLAGS+=" -Wmissing-declarations"
-		CFLAGS+=" -Wredundant-decls"
-		CFLAGS+=" -Wswitch-enum"
-		CFLAGS+=" -Wtype-limits"
-		CFLAGS+=" -Wvariadic-macros"
-		CFLAGS+=" -Wformat -Wformat-security"
+		CFLAGS="$CFLAGS -Werror -Wextra"
+		CFLAGS="$CFLAGS -Wno-unused-parameter"
+		CFLAGS="$CFLAGS -Wno-missing-field-initializers"
+		CFLAGS="$CFLAGS -Wdeclaration-after-statement"
+		CFLAGS="$CFLAGS -Wmissing-declarations"
+		CFLAGS="$CFLAGS -Wredundant-decls"
+		CFLAGS="$CFLAGS -Wswitch-enum"
+		CFLAGS="$CFLAGS -Wtype-limits"
+		CFLAGS="$CFLAGS -Wformat -Wformat-security"
 		if ( $CC -v 2>/dev/null | grep "gcc version" ); then
-			CFLAGS+=" -Wcast-align"
+			CFLAGS="$CFLAGS -Wcast-align"
 		fi
+
+		if (test "$CC" = "clang"); then
+			CFLAGS="$CFLAGS -Werror=zero-length-array"
+		fi
+	fi
+
+	if (test "$CC" = "clang"); then
+		CFLAGS="$CFLAGS -Wno-unknown-warning-option"
+		CFLAGS="$CFLAGS -Wno-unknown-pragmas"
 	fi
 ])

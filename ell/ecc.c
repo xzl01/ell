@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2018  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2018 Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -562,8 +547,24 @@ LIB_EXPORT struct l_ecc_point *l_ecc_point_from_data(
 		if (!_ecc_compute_y(curve, p->y, p->x))
 			goto failed;
 
+		/*
+		 * This is determining whether or not to subtract the Y
+		 * coordinate from P. According to ANSI X9.62 an even Y should
+		 * be prefixed with 02 (BIT0) and an odd Y should be prefixed
+		 * with 03 (BIT1). If this is not the case, subtract Y from P.
+		 *
+		 * ANSI X9.62
+		 * 4.3.6 Point-to-Octet-String Conversion
+		 *
+		 * 2. If the compressed form is used, then do the following:
+		 *     2.1. Compute the bit ~Yp . (See Section 4.2.)
+		 *     2.2. Assign the value 02 to the single octet PC if ~Yp
+		 *          is 0, or the value 03 if ~Yp is 1.
+		 *     2.3. The result is the octet string PO = PC || X
+		 */
+
 		sub = secure_select(type == L_ECC_POINT_TYPE_COMPRESSED_BIT0,
-					!(p->y[0] & 1), p->y[0] & 1);
+					p->y[0] & 1, !(p->y[0] & 1));
 
 		_vli_mod_sub(tmp, curve->p, p->y, curve->p, curve->ndigits);
 
@@ -805,9 +806,17 @@ LIB_EXPORT struct l_ecc_scalar *l_ecc_scalar_new(
 	return NULL;
 }
 
+LIB_EXPORT struct l_ecc_scalar *l_ecc_scalar_clone(const struct l_ecc_scalar *s)
+{
+	if (!s)
+		return NULL;
+
+	return l_memdup(s, sizeof(*s));
+}
+
 /*
  * Build a scalar = value modulo p where p is the prime number for a given
- * curve.  bytes can contain a numer with up to 2x number of digits as the
+ * curve.  bytes can contain a number with up to 2x number of digits as the
  * curve.  This is used in Hash to Curve calculations.
  */
 LIB_EXPORT struct l_ecc_scalar *l_ecc_scalar_new_modp(
@@ -835,6 +844,41 @@ LIB_EXPORT struct l_ecc_scalar *l_ecc_scalar_new_modp(
 	_ecc_be2native(tmp, bytes, ndigits);
 
 	_vli_mmod_fast(c->c, tmp, curve->p, curve->ndigits);
+
+	if (!_vli_is_zero_or_one(c->c, curve->ndigits) &&
+			secure_memcmp_64(curve->n, c->c, curve->ndigits) > 0)
+		return c;
+
+	l_ecc_scalar_free(c);
+
+	return NULL;
+}
+
+LIB_EXPORT struct l_ecc_scalar *l_ecc_scalar_new_modn(
+					const struct l_ecc_curve *curve,
+					const void *bytes, size_t len)
+{
+	struct l_ecc_scalar *c;
+	uint64_t tmp[2 * L_ECC_MAX_DIGITS];
+	unsigned int ndigits = len / 8;
+
+	if (!bytes)
+		return NULL;
+
+	if (len % 8)
+		return NULL;
+
+	if (ndigits > curve->ndigits * 2)
+		return NULL;
+
+	c = _ecc_constant_new(curve, NULL, 0);
+	if (!c)
+		return NULL;
+
+	memset(tmp, 0, sizeof(tmp));
+	_ecc_be2native(tmp, bytes, ndigits);
+
+	_vli_mmod_slow(c->c, tmp, curve->n, curve->ndigits);
 
 	if (!_vli_is_zero_or_one(c->c, curve->ndigits) &&
 			secure_memcmp_64(curve->n, c->c, curve->ndigits) > 0)
@@ -939,6 +983,18 @@ LIB_EXPORT bool l_ecc_point_multiply(struct l_ecc_point *ret,
 	return true;
 }
 
+LIB_EXPORT bool l_ecc_point_multiply_g(struct l_ecc_point *ret,
+					const struct l_ecc_scalar *scalar)
+{
+	if (unlikely(!ret || !scalar))
+		return false;
+
+	_ecc_point_mult(ret, &scalar->curve->g, scalar->c, NULL,
+						scalar->curve->p);
+
+	return true;
+}
+
 LIB_EXPORT bool l_ecc_point_add(struct l_ecc_point *ret,
 					const struct l_ecc_point *a,
 					const struct l_ecc_point *b)
@@ -1009,4 +1065,9 @@ LIB_EXPORT bool l_ecc_points_are_equal(const struct l_ecc_point *a,
 
 	return ((memcmp(a->x, b->x, a->curve->ndigits * 8) == 0) &&
 			(memcmp(a->y, b->y, a->curve->ndigits * 8) == 0));
+}
+
+LIB_EXPORT bool l_ecc_point_is_infinity(const struct l_ecc_point *p)
+{
+	return _ecc_point_is_zero(p);
 }

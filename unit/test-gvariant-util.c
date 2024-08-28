@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -659,6 +644,7 @@ static void test_iter_variant_2(const void *test_data)
 	assert(ret);
 
 	ret = _gvariant_iter_enter_struct(&variant, &structure);
+	assert(ret);
 
 	ret = _gvariant_iter_next_entry_basic(&structure, 's', &s);
 	assert(ret);
@@ -1062,6 +1048,7 @@ static void test_iter_header_1(const void *test_data)
 
 	ret = _gvariant_iter_init(&iter, NULL, "a(yv)", NULL,
 					test->data + 16, u);
+	assert(ret);
 	ret = _gvariant_iter_enter_array(&iter, &array);
 	assert(ret);
 
@@ -1323,6 +1310,7 @@ static void test_builder_fixed_struct_2(const void *test_data)
 	assert(ret);
 
 	ret = _gvariant_builder_append_basic(builder, 't', &t);
+	assert(ret);
 
 	ret = _gvariant_builder_leave_struct(builder);
 	assert(ret);

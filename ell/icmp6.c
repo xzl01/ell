@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2020  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2020  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -802,8 +787,16 @@ struct l_icmp6_router *_icmp6_router_new()
 
 void _icmp6_router_free(struct l_icmp6_router *r)
 {
+	unsigned int i;
+
 	l_free(r->routes);
 	l_free(r->ac_prefixes);
+	l_free(r->dns_list);
+
+	for (i = 0; i < r->n_domains; i++)
+		l_free(r->domains[i].domain);
+
+	l_free(r->domains);
 	l_free(r);
 }
 

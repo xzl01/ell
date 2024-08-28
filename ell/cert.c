@@ -1,21 +1,8 @@
 /*
- *  Embedded Linux library
+ * Embedded Linux library
+ * Copyright (C) 2018  Intel Corporation
  *
- *  Copyright (C) 2018  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -67,7 +54,7 @@ struct l_cert {
 	struct l_cert *issuer;
 	struct l_cert *issued;
 	size_t asn1_len;
-	uint8_t asn1[0];
+	uint8_t asn1[];
 };
 
 struct l_certchain {
@@ -1671,7 +1658,6 @@ static int cert_try_load_der_format(const uint8_t *content, size_t content_len,
 {
 	const uint8_t *seq;
 	size_t seq_len;
-	const uint8_t *elem_data;
 	size_t elem_len;
 	uint8_t tag;
 
@@ -1687,8 +1673,7 @@ static int cert_try_load_der_format(const uint8_t *content, size_t content_len,
 	 * to add any more formats we'll probably need to start guessing
 	 * from the filename suffix.
 	 */
-	if (!(elem_data = asn1_der_find_elem(seq, seq_len,
-						0, &tag, &elem_len)))
+	if (!asn1_der_find_elem(seq, seq_len,0, &tag, &elem_len))
 		return -ENOMSG;
 
 	if (tag == ASN1_ID_SEQUENCE) {

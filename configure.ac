@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([ell],[0.56])
+AC_INIT([ell],[0.67])
 
 AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_AUX_DIR(build-aux)
@@ -114,20 +114,33 @@ AC_CHECK_HEADERS(linux/types.h linux/if_alg.h)
 AC_ARG_ENABLE(glib, AS_HELP_STRING([--enable-glib],
 				[enable ell/glib main loop example]),
 					[enable_glib=${enableval}])
-
 if (test "${enable_glib}" = "yes"); then
 	PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.32, dummy=yes,
 				AC_MSG_ERROR(GLib >= 2.32 is required))
 	AC_SUBST(GLIB_CFLAGS)
 	AC_SUBST(GLIB_LIBS)
 fi
-
 AM_CONDITIONAL(GLIB, test "${enable_glib}" = "yes")
 
 if (test "$USE_MAINTAINER_MODE" = "yes"); then
 	AC_CHECK_PROG(have_openssl, [openssl], [yes], [no])
 	AC_CHECK_PROG(have_xxd, [xxd], [yes], [no])
 fi
+
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],
+				[disable unit tests compilation]),
+					[enable_tests=${enableval}])
+AM_CONDITIONAL(TESTS, test "${enable_tests}" != "no")
+
+AC_ARG_ENABLE(tools, AS_HELP_STRING([--disable-tools],
+				[disable extra tools compilation]),
+					[enable_tools=${enableval}])
+AM_CONDITIONAL(TOOLS, test "${enable_tools}" != "no")
+
+AC_ARG_ENABLE(examples, AS_HELP_STRING([--disable-examples],
+				[disable code examples compilation]),
+					[enable_examples=${enableval}])
+AM_CONDITIONAL(EXAMPLES, test "${enable_examples}" != "no")
 
 AM_CONDITIONAL(DBUS_TESTS, test "${little_endian}" = "yes")
 AM_CONDITIONAL(CERT_TESTS, test "${have_openssl}" = "yes")

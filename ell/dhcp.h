@@ -1,33 +1,18 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2018  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2018  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifndef __ELL_DHCP_H
 #define __ELL_DHCP_H
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdbool.h>
 
 struct l_dhcp_client;
 struct l_dhcp_lease;
@@ -56,6 +41,7 @@ enum l_dhcp_client_event {
 	L_DHCP_CLIENT_EVENT_LEASE_EXPIRED,
 	L_DHCP_CLIENT_EVENT_LEASE_RENEWED,
 	L_DHCP_CLIENT_EVENT_NO_LEASE,
+	L_DHCP_CLIENT_EVENT_MAX_ATTEMPTS_REACHED,
 };
 
 enum l_dhcp_server_event {
@@ -88,6 +74,8 @@ bool l_dhcp_client_set_hostname(struct l_dhcp_client *client,
 
 bool l_dhcp_client_set_rtnl(struct l_dhcp_client *client,
 					struct l_netlink *rtnl);
+bool l_dhcp_client_set_max_attempts(struct l_dhcp_client *client,
+					uint8_t attempts);
 
 const struct l_dhcp_lease *l_dhcp_client_get_lease(
 					const struct l_dhcp_client *client);
@@ -134,7 +122,7 @@ bool l_dhcp_server_set_ip_range(struct l_dhcp_server *server,
 				const char *end_ip);
 bool l_dhcp_server_set_debug(struct l_dhcp_server *server,
 				l_dhcp_debug_cb_t function,
-				void *user_data, l_dhcp_destroy_cb_t destory);
+				void *user_data, l_dhcp_destroy_cb_t destroy);
 bool l_dhcp_server_set_event_handler(struct l_dhcp_server *server,
 					l_dhcp_server_event_cb_t handler,
 					void *user_data,

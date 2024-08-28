@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -28,6 +13,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <stdint.h>
+#include <errno.h>
 
 #include "utf8.h"
 #include "util.h"
@@ -140,7 +127,7 @@ LIB_EXPORT void l_free(void *ptr)
  * l_strdup:
  * @str: string pointer
  *
- * Allocates and duplicates sring
+ * Allocates and duplicates string
  *
  * Returns: a newly allocated string
  **/
@@ -166,7 +153,7 @@ LIB_EXPORT char *l_strdup(const char *str)
  * @str: string pointer
  * @max: Maximum number of characters to copy
  *
- * Allocates and duplicates sring.  If the string is longer than @max
+ * Allocates and duplicates string.  If the string is longer than @max
  * characters, only @max are copied and a null terminating character
  * is added.
  *
@@ -744,4 +731,84 @@ __attribute__((noinline)) static int __secure_memeq(const void *field,
 LIB_EXPORT bool l_secure_memeq(const void *field, size_t size, uint8_t byte)
 {
 	return __secure_memeq(field, size, byte) == 0 ? true : false;
+}
+
+static int safe_atou(const char *s, int base, unsigned int *out_u)
+{
+	unsigned long int r;
+	unsigned int t;
+	char *endp;
+
+	errno = 0;
+
+	t = r = strtoul(s, &endp, base);
+	if (unlikely(errno > 0))
+		return -errno;
+
+	if (endp == s || *endp != '\0')
+		return -EINVAL;
+
+	if (unlikely(r != t))
+		return -ERANGE;
+
+	if (out_u)
+		*out_u = t;
+
+	return 0;
+}
+
+LIB_EXPORT int l_safe_atou32(const char *s, uint32_t *out_u)
+{
+	if (!l_ascii_isdigit(s[0]))
+		return -EINVAL;
+
+	/* Don't allow leading zeros */
+	if (s[0] == '0' && s[1] != '\0')
+		return -EINVAL;
+
+	return safe_atou(s, 10, out_u);
+}
+
+LIB_EXPORT int l_safe_atox8(const char *s, uint8_t *out_x)
+{
+	uint32_t x;
+	int r;
+
+	r = l_safe_atox32(s, &x);
+	if (r < 0)
+		return r;
+
+	if (x > UINT8_MAX)
+		return -ERANGE;
+
+	if (out_x)
+		*out_x = x;
+
+	return 0;
+}
+
+LIB_EXPORT int l_safe_atox16(const char *s, uint16_t *out_x)
+{
+	uint32_t x;
+	int r;
+
+	r = l_safe_atox32(s, &x);
+	if (r < 0)
+		return r;
+
+	if (x > UINT16_MAX)
+		return -ERANGE;
+
+	if (out_x)
+		*out_x = x;
+
+	return 0;
+}
+
+LIB_EXPORT int l_safe_atox32(const char *s, uint32_t *out_x)
+{
+	if (!l_ascii_isxdigit(s[0]))
+		return -EINVAL;
+
+	return safe_atou(s, 16, out_x);
 }

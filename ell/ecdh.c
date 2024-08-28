@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2018  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2018 Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -31,6 +16,7 @@
 #include "ecc.h"
 #include "ecdh.h"
 #include "random.h"
+#include "useful.h"
 
 /*
  * Some sane maximum for calculating the public key.
@@ -55,6 +41,9 @@ LIB_EXPORT bool l_ecdh_generate_key_pair(const struct l_ecc_curve *curve,
 	bool compliant = false;
 	int iter = 0;
 	uint64_t p2[L_ECC_MAX_DIGITS];
+
+	if (unlikely(!curve || !out_private || !out_public))
+		return false;
 
 	_ecc_calculate_p2(curve, p2);
 
@@ -91,6 +80,9 @@ LIB_EXPORT bool l_ecdh_generate_shared_secret(
 	const struct l_ecc_curve *curve = private_key->curve;
 	struct l_ecc_scalar *z;
 	struct l_ecc_point *product;
+
+	if (unlikely(!private_key || !other_public || !secret))
+		return false;
 
 	z = l_ecc_scalar_new_random(curve);
 

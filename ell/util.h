@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifndef __ELL_UTIL_H
@@ -29,6 +14,8 @@
 #include <inttypes.h>
 #include <endian.h>
 #include <byteswap.h>
+#include <unistd.h>
+#include <errno.h>
 #include <sys/uio.h>
 #include <ell/cleanup.h>
 
@@ -55,6 +42,27 @@ _Pragma("GCC diagnostic pop")						\
 				#condition);				\
 		r;							\
 	})
+
+/*
+ * If ELL headers and iterfaces end up getting compiled in a C++
+ * environment, even though ELL itself is a C source based and is
+ * compiled as such, certain assignments may be flagged by the C++
+ * compiler as errors or warnings. The following portable casts should
+ * be used in such cases, with a preference towards L_PERMISSIVE_CAST
+ * where possible since it is not a cast in C and, therefore, will not
+ * mask otherwise-legitimate warnings in that environment.
+ */
+#ifdef __cplusplus
+#define L_CONST_CAST(t, v)       const_cast<t>(v)
+#define L_REINTERPRET_CAST(t, v) reinterpret_cast<t>(v)
+#define L_STATIC_CAST(t, v)      static_cast<t>(v)
+#define L_PERMISSIVE_CAST(t, v)  L_STATIC_CAST(t, v)
+#else
+#define L_CONST_CAST(t, v)       ((t)(v))
+#define L_REINTERPRET_CAST(t, v) ((t)(v))
+#define L_STATIC_CAST(t, v)      ((t)(v))
+#define L_PERMISSIVE_CAST(t, v)  (v)
+#endif
 
 #define L_PTR_TO_UINT(p) ((unsigned int) ((uintptr_t) (p)))
 #define L_UINT_TO_PTR(u) ((void *) ((uintptr_t) (u)))
@@ -267,6 +275,26 @@ static inline void auto_free(void *a)
 		__p;				\
 	}))
 
+/**
+ * l_newa:
+ * @type: type of structure
+ * @count: amount of structures
+ *
+ * Allocates stack space for @count structures of @type.  Memory is allocated
+ * using alloca and initialized to 0.
+ *
+ * Returns: Pointer to memory allocated on the stack.
+ */
+#define l_newa(type, count)			\
+	(type *) (__extension__ ({		\
+		size_t __n = (size_t) (count);	\
+		size_t __s = sizeof(type);	\
+		void *__p;			\
+		__p = alloca(__n * __s);	\
+		memset(__p, 0, __n * __s);	\
+		__p;				\
+	}))
+
 char *l_strdup(const char *str);
 char *l_strndup(const char *str, size_t max);
 char *l_strdup_printf(const char *format, ...)
@@ -309,11 +337,20 @@ const char *l_util_get_debugfs_path(void);
        while (__result == -1L && errno == EINTR);  \
        __result; }))
 
+/* Enables declaring _auto_(close) int fd = <-1 or L_TFR(open(...))>; */
+inline __attribute__((always_inline)) void _l_close_cleanup(void *p)
+{
+	int fd = *(int *) p;
+
+	if (fd >= 0)
+		L_TFR(close(fd));
+}
+
 #define _L_IN_SET_CMP(val, type, cmp, ...) __extension__ ({		\
 		const type __v = (val);					\
 		const typeof(__v) __elems[] = {__VA_ARGS__};		\
-		unsigned int __i;					\
-		static const unsigned int __n = L_ARRAY_SIZE(__elems);	\
+		size_t __i;						\
+		const size_t __n = L_ARRAY_SIZE(__elems);		\
 		bool __r = false;					\
 		for (__i = 0; __i < __n && !__r; __i++)			\
 			__r = (cmp);					\
@@ -328,6 +365,50 @@ const char *l_util_get_debugfs_path(void);
 	_L_IN_SET_CMP((val), char *, __v == __elems[__i] ||		\
 				(__v && __elems[__i] &&			\
 				 !strcmp(__v, __elems[__i])), ##__VA_ARGS__)
+
+#define _L_BIT_TO_MASK(bits, nr) __extension__ ({			\
+	typeof(*(bits)) _one = 1U;					\
+	const unsigned int _shift = (nr) % (sizeof(_one) * 8);		\
+	_one << _shift;							\
+})
+
+#define _L_BIT_TO_OFFSET(bits, nr) __extension__ ({			\
+	__auto_type _bits = (bits);					\
+	const size_t _offset = (nr) / (sizeof(*_bits) * 8);		\
+	_bits + _offset;						\
+})
+
+#define L_BIT_SET(bits, nr) __extension__ ({				\
+	size_t _nr = (nr);						\
+	__auto_type _offset = _L_BIT_TO_OFFSET(bits, _nr);		\
+	*_offset |= _L_BIT_TO_MASK(_offset, _nr);			\
+})
+
+#define L_BIT_CLEAR(bits, nr) __extension__ ({				\
+	size_t _nr = (nr);						\
+	__auto_type _offset = _L_BIT_TO_OFFSET(bits, _nr);		\
+	*_offset &= ~_L_BIT_TO_MASK(_offset, _nr);			\
+})
+
+#define L_BIT_TEST(bits, nr) __extension__ ({				\
+	size_t _nr = (nr);						\
+	__auto_type _offset = _L_BIT_TO_OFFSET(bits, _nr);		\
+	(*_offset & _L_BIT_TO_MASK(_offset, _nr)) != 0;			\
+})
+
+#define L_BITS_SET(bits, ...) __extension__ ({				\
+	const unsigned int __elems[] = {__VA_ARGS__};			\
+	size_t __i;							\
+	for (__i = 0; __i < L_ARRAY_SIZE(__elems); __i++)		\
+		L_BIT_SET(bits, __elems[__i]);				\
+})
+
+#define L_BITS_CLEAR(bits, ...) __extension__ ({			\
+	const unsigned int __elems[] = {__VA_ARGS__};			\
+	size_t __i;							\
+	for (__i = 0; __i < L_ARRAY_SIZE(__elems); __i++)		\
+		L_BIT_CLEAR(bits, __elems[__i]);			\
+})
 
 /*
  * Taken from https://github.com/chmike/cst_time_memcmp, adding a volatile to
@@ -365,8 +446,10 @@ const char *l_util_get_debugfs_path(void);
 static inline int l_secure_memcmp(const void *a, const void *b,
 					size_t size)
 {
-	const volatile uint8_t *aa = a;
-	const volatile uint8_t *bb = b;
+	const volatile uint8_t *aa =
+		L_PERMISSIVE_CAST(const volatile uint8_t *, a);
+	const volatile uint8_t *bb =
+		L_PERMISSIVE_CAST(const volatile uint8_t *, b);
 	int res = 0, diff, mask;
 
 	/*
@@ -417,15 +500,20 @@ static inline void l_secure_select(bool select_left,
 				const void *left, const void *right,
 				void *out, size_t len)
 {
-	const uint8_t *l = left;
-	const uint8_t *r = right;
-	uint8_t *o = out;
+	const uint8_t *l = L_PERMISSIVE_CAST(const uint8_t *, left);
+	const uint8_t *r = L_PERMISSIVE_CAST(const uint8_t *, right);
+	uint8_t *o = L_PERMISSIVE_CAST(uint8_t *, out);
 	uint8_t mask = -(!!select_left);
 	size_t i;
 
 	for (i = 0; i < len; i++)
 		o[i] = r[i] ^ ((l[i] ^ r[i]) & mask);
 }
+
+int l_safe_atou32(const char *s, uint32_t *out_u);
+int l_safe_atox32(const char *s, uint32_t *out_u);
+int l_safe_atox16(const char *s, uint16_t *out_u);
+int l_safe_atox8(const char *s, uint8_t *out_u);
 
 #ifdef __cplusplus
 }

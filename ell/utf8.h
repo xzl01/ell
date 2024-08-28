@@ -1,23 +1,9 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
+ * Copyright (C) 2024  Cruise, LLC
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifndef __ELL_UTF8_H
@@ -100,6 +86,25 @@ static inline __attribute__ ((always_inline)) bool l_ascii_isascii(int c)
 
 	return false;
 }
+
+static inline __attribute__ ((always_inline)) char l_ascii_toupper(char c)
+{
+	if (!l_ascii_islower(c))
+		return c;
+
+	return c - 32;
+}
+
+static inline __attribute__ ((always_inline)) char l_ascii_tolower(char c)
+{
+	if (!l_ascii_isupper(c))
+		return c;
+
+	return c + 32;
+}
+
+char *l_ascii_strdown(const char *str, ssize_t len);
+char *l_ascii_strup(const char *str, ssize_t len);
 
 bool l_utf8_validate(const char *src, size_t len, const char **end);
 size_t l_utf8_strlen(const char *str);

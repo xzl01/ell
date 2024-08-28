@@ -1,21 +1,8 @@
 /*
- *  Embedded Linux library
+ * Embedded Linux library
+ * Copyright (C) 2015  Intel Corporation
  *
- *  Copyright (C) 2015  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -1324,7 +1311,7 @@ static ssize_t tls_append_hello_extensions(struct l_tls *tls,
 		 * Note: could handle NULL client_write with non-NULL
 		 * server_handle or server_handle_absent as "server-oriented"
 		 * extension (7.4.1.4) and write empty extension_data and
-		 * simliarly require empty extension_data in
+		 * similarly require empty extension_data in
 		 * tls_handle_client_hello if client_handle NULL.
 		 */
 		if (!ext_write)
@@ -3312,7 +3299,7 @@ static void tls_handle_handshake(struct l_tls *tls, int type,
 		 *
 		 *    * (RSA key exchange algorithm case) the correct
 		 *      receival of this Finished message confirms the
-		 *      posession of the master secret, it is verified by
+		 *      possession of the master secret, it is verified by
 		 *      both the successful decryption and the MAC of this
 		 *      message (either should be enough) because we entered
 		 *      the TLS_HANDSHAKE_WAIT_FINISHED state only after

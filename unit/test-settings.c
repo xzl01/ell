@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -152,6 +137,7 @@ static const char *data1 = "[Foobar]\n#Comment\n#Comment2\nKey=Value\n"
 		"IntegerG=2247483647\nIntegerH=4294967296\n"
 		"IntegerI=9223372036854775808\n"
 		"IntegerJ=18446744073709551616\n"
+		"IntegerEmpty=\n"
 		"String=\\tFoobar\\s\n"
 		"StringEmpty=\n"
 		"StringBad1=Foobar\\\n"
@@ -214,6 +200,10 @@ static void test_settings(struct l_settings *settings)
 	assert(!l_settings_get_uint(settings, "Foobar", "FoobarH", &uint32));
 	assert(!l_settings_get_int64(settings, "Foobar", "IntegerI", &int64));
 	assert(!l_settings_get_uint64(settings, "Foobar", "IntegerJ", &uint64));
+	assert(!l_settings_get_int(settings, "Foobar",
+					"IntegerEmpty", &int32));
+	assert(!l_settings_get_uint(settings, "Foobar",
+					"IntegerEmpty", &uint32));
 
 	str = l_settings_get_string(settings, "Foobar", "String");
 	assert(str);

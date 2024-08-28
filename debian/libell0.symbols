@@ -14,9 +14,12 @@ libell.so.0 libell0 #MINVER#
  l_aead_cipher_free@ELL_0.10 0.15
  l_aead_cipher_is_supported@ELL_0.10 0.15
  l_aead_cipher_new@ELL_0.10 0.15
+ l_ascii_strdown@ELL_0.10 0.62
+ l_ascii_strup@ELL_0.10 0.62
  l_ascii_table@ELL_0.10 0.15
  l_base64_decode@ELL_0.10 0.15
  l_base64_encode@ELL_0.10 0.15
+ l_basename@ELL_0.10 0.66
  l_cert_free@ELL_0.10 0.16
  l_cert_get_der_data@ELL_0.10 0.16
  l_cert_get_dn@ELL_0.10 0.16
@@ -172,6 +175,7 @@ libell.so.0 libell0 #MINVER#
  l_dhcp_client_set_event_handler@ELL_0.10 0.15
  l_dhcp_client_set_hostname@ELL_0.10 0.15
  l_dhcp_client_set_interface_name@ELL_0.10 0.15
+ l_dhcp_client_set_max_attempts@ELL_0.10 0.62
  l_dhcp_client_set_rtnl@ELL_0.10 0.35
  l_dhcp_client_start@ELL_0.10 0.15
  l_dhcp_client_stop@ELL_0.10 0.15
@@ -213,6 +217,7 @@ libell.so.0 libell0 #MINVER#
  l_dhcp_server_set_netmask@ELL_0.10 0.35
  l_dhcp_server_start@ELL_0.10 0.35
  l_dhcp_server_stop@ELL_0.10 0.35
+ l_dir_create@ELL_0.10 0.62
  l_dir_watch_destroy@ELL_0.10 0.15
  l_dir_watch_new@ELL_0.10 0.15
  l_ecc_curve_from_ike_group@ELL_0.10 0.43
@@ -234,16 +239,20 @@ libell.so.0 libell0 #MINVER#
  l_ecc_point_get_x@ELL_0.10 0.17
  l_ecc_point_get_y@ELL_0.10 0.43
  l_ecc_point_inverse@ELL_0.10 0.17
+ l_ecc_point_is_infinity@ELL_0.10 0.61
  l_ecc_point_multiply@ELL_0.10 0.17
+ l_ecc_point_multiply_g@ELL_0.10 0.61
  l_ecc_point_new@ELL_0.10 0.17
  l_ecc_point_y_isodd@ELL_0.10 0.48
  l_ecc_points_are_equal@ELL_0.10 0.17
  l_ecc_scalar_add@ELL_0.10 0.17
+ l_ecc_scalar_clone@ELL_0.10 0.64
  l_ecc_scalar_free@ELL_0.10 0.17
  l_ecc_scalar_get_data@ELL_0.10 0.17
  l_ecc_scalar_legendre@ELL_0.10 0.17
  l_ecc_scalar_multiply@ELL_0.10 0.17
  l_ecc_scalar_new@ELL_0.10 0.17
+ l_ecc_scalar_new_modn@ELL_0.10 0.61
  l_ecc_scalar_new_modp@ELL_0.10 0.43
  l_ecc_scalar_new_random@ELL_0.10 0.17
  l_ecc_scalar_new_reduced_1_to_n@ELL_0.10 0.43
@@ -254,6 +263,7 @@ libell.so.0 libell0 #MINVER#
  l_ecdh_generate_key_pair@ELL_0.10 0.17
  l_ecdh_generate_shared_secret@ELL_0.10 0.17
  l_file_get_contents@ELL_0.10 0.15
+ l_file_set_contents@ELL_0.10 0.62
  l_free@ELL_0.10 0.15
  l_genl_add_family_watch@ELL_0.10 0.21
  l_genl_add_unicast_watch@ELL_0.10 0.21
@@ -448,6 +458,12 @@ libell.so.0 libell0 #MINVER#
  l_netlink_send@ELL_0.10 0.15
  l_netlink_set_debug@ELL_0.10 0.15
  l_netlink_unregister@ELL_0.10 0.15
+ l_notifylist_add@ELL_0.10 0.66
+ l_notifylist_free@ELL_0.10 0.66
+ l_notifylist_new@ELL_0.10 0.66
+ l_notifylist_notify@ELL_0.10 0.66
+ l_notifylist_notify_matches@ELL_0.10 0.66
+ l_notifylist_remove@ELL_0.10 0.66
  l_parse_args@ELL_0.10 0.15
  l_path_find@ELL_0.10 0.22
  l_path_get_mtime@ELL_0.10 0.22
@@ -563,6 +579,10 @@ libell.so.0 libell0 #MINVER#
  l_rtnl_set_linkmode_and_operstate@ELL_0.10 0.31
  l_rtnl_set_mac@ELL_0.10 0.31
  l_rtnl_set_powered@ELL_0.10 0.31
+ l_safe_atou32@ELL_0.10 0.59
+ l_safe_atox16@ELL_0.10 0.59
+ l_safe_atox32@ELL_0.10 0.59
+ l_safe_atox8@ELL_0.10 0.59
  l_secure_memeq@ELL_0.10 0.40
  l_settings_add_group@ELL_0.10 0.40
  l_settings_clone@ELL_0.10 0.49
@@ -638,6 +658,10 @@ libell.so.0 libell0 #MINVER#
  l_strv_free@ELL_0.10 0.15
  l_strv_length@ELL_0.10 0.15
  l_strv_new@ELL_0.10 0.21
+ l_sysctl_get_char@ELL_0.10 0.67
+ l_sysctl_get_u32@ELL_0.10 0.59
+ l_sysctl_set_char@ELL_0.10 0.67
+ l_sysctl_set_u32@ELL_0.10 0.59
  l_test_add@ELL_0.10 0.15
  l_test_init@ELL_0.10 0.15
  l_test_run@ELL_0.10 0.15

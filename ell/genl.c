@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -35,6 +20,7 @@
 #include "io.h"
 #include "private.h"
 #include "netlink-private.h"
+#include "notifylist.h"
 #include "genl.h"
 
 #define MAX_NESTING_LEVEL 4
@@ -48,11 +34,9 @@ struct nest_info {
 };
 
 struct unicast_watch {
-	uint32_t id;
+	struct l_notifylist_entry super;
 	char name[GENL_NAMSIZ];
 	l_genl_msg_func_t handler;
-	void *user_data;
-	l_genl_destroy_func_t destroy;
 };
 
 struct family_watch {
@@ -84,7 +68,7 @@ struct l_genl {
 	unsigned int next_notify_id;
 	struct genl_discovery *discovery;
 	uint32_t next_watch_id;
-	struct l_queue *unicast_watches;
+	struct l_notifylist *unicast_watches;
 	struct l_queue *family_watches;
 	struct l_queue *family_infos;
 	struct l_genl_family *nlctrl;
@@ -255,7 +239,8 @@ static void family_ops(struct l_genl_family_info *info,
 		struct l_genl_attr attr_op;
 		uint32_t id = 0, flags = 0;
 
-		l_genl_attr_recurse(attr, &attr_op);
+		if (!l_genl_attr_recurse(attr, &attr_op))
+			continue;
 
 		while (l_genl_attr_next(&attr_op, &type, &len, &data)) {
 			switch (type) {
@@ -284,7 +269,8 @@ static void family_mcast_groups(struct l_genl_family_info *info,
 		const char *name = NULL;
 		uint32_t id = 0;
 
-		l_genl_attr_recurse(attr, &attr_grp);
+		if (!l_genl_attr_recurse(attr, &attr_grp))
+			continue;
 
 		while (l_genl_attr_next(&attr_grp, &type, &len, &data)) {
 			switch (type) {
@@ -462,32 +448,38 @@ LIB_EXPORT uint32_t l_genl_family_info_get_version(
 	return info->version;
 }
 
-static void unicast_watch_free(void *data)
+static void unicast_watch_free(struct l_notifylist_entry *e)
 {
-	struct unicast_watch *watch = data;
-
-	if (watch->destroy)
-		watch->destroy(watch->user_data);
-
+	struct unicast_watch *watch =
+			l_container_of(e, struct unicast_watch, super);
 	l_free(watch);
 }
 
-static bool unicast_watch_match(const void *a, const void *b)
+static void unicast_watch_notify(const struct l_notifylist_entry *e,
+						int type, va_list args)
 {
-	const struct unicast_watch *watch = a;
-	uint32_t id = L_PTR_TO_UINT(b);
+	const struct unicast_watch *watch =
+			l_container_of(e, struct unicast_watch, super);
 
-	return watch->id == id;
+	if (!watch->handler)
+		return;
+
+	watch->handler(va_arg(args, struct l_genl_msg *),
+			watch->super.notify_data);
 }
 
-static void unicast_watch_prune(struct l_genl *genl)
-{
-	struct unicast_watch *watch;
+static struct l_notifylist_ops unicast_watch_ops = {
+	.free_entry = unicast_watch_free,
+	.notify = unicast_watch_notify,
+};
 
-	while ((watch = l_queue_remove_if(genl->unicast_watches,
-						unicast_watch_match,
-						L_UINT_TO_PTR(0))))
-		unicast_watch_free(watch);
+static bool unicast_watch_match_name(const struct l_notifylist_entry *e,
+					const void *user)
+{
+	struct unicast_watch *watch =
+			l_container_of(e, struct unicast_watch, super);
+
+	return !strncmp(watch->name, user, GENL_NAMSIZ);
 }
 
 static void family_watch_free(void *data)
@@ -883,39 +875,6 @@ static bool match_request_seq(const void *a, const void *b)
 	return request->seq == seq;
 }
 
-static void dispatch_unicast_watches(struct l_genl *genl, uint16_t id,
-							struct l_genl_msg *msg)
-{
-	const struct l_queue_entry *entry;
-	struct l_genl_family_info *info = l_queue_find(genl->family_infos,
-							family_info_match,
-							L_UINT_TO_PTR(id));
-
-	if (!info)
-		return;
-
-	genl->in_unicast_watch_notify = true;
-
-	for (entry = l_queue_get_entries(genl->unicast_watches);
-						entry; entry = entry->next) {
-		struct unicast_watch *watch = entry->data;
-
-		if (!watch->id)
-			continue;
-
-		if (!watch->handler)
-			continue;
-
-		if (strncmp(watch->name, info->name, GENL_NAMSIZ))
-			continue;
-
-		watch->handler(msg, watch->user_data);
-	}
-
-	genl->in_unicast_watch_notify = false;
-	unicast_watch_prune(genl);
-}
-
 static void process_unicast(struct l_genl *genl, const struct nlmsghdr *nlmsg)
 {
 	struct l_genl_msg *msg;
@@ -927,8 +886,15 @@ static void process_unicast(struct l_genl *genl, const struct nlmsghdr *nlmsg)
 
 	msg = msg_create(nlmsg);
 	if (!nlmsg->nlmsg_seq) {
-		if (msg)
-			dispatch_unicast_watches(genl, nlmsg->nlmsg_type, msg);
+		struct l_genl_family_info *info =
+			l_queue_find(genl->family_infos, family_info_match,
+					L_UINT_TO_PTR(nlmsg->nlmsg_type));
+
+		if (info && msg)
+			l_notifylist_notify_matches(genl->unicast_watches,
+						unicast_watch_match_name,
+						info->name, 0, msg);
+
 		goto done;
 	}
 
@@ -1120,7 +1086,7 @@ LIB_EXPORT struct l_genl *l_genl_new(void)
 	genl->notify_list = l_queue_new();
 	genl->family_watches = l_queue_new();
 	genl->family_infos = l_queue_new();
-	genl->unicast_watches = l_queue_new();
+	genl->unicast_watches = l_notifylist_new(&unicast_watch_ops);
 
 	l_queue_push_head(genl->family_infos, build_nlctrl_info());
 
@@ -1163,7 +1129,7 @@ LIB_EXPORT void l_genl_unref(struct l_genl *genl)
 
 	l_genl_family_free(genl->nlctrl);
 
-	l_queue_destroy(genl->unicast_watches, unicast_watch_free);
+	l_notifylist_free(genl->unicast_watches);
 	l_queue_destroy(genl->family_watches, family_watch_free);
 	l_queue_destroy(genl->family_infos, family_info_free);
 	l_queue_destroy(genl->notify_list, mcast_notify_free);
@@ -1298,12 +1264,10 @@ LIB_EXPORT unsigned int l_genl_add_unicast_watch(struct l_genl *genl,
 	watch = l_new(struct unicast_watch, 1);
 	l_strlcpy(watch->name, family, GENL_NAMSIZ);
 	watch->handler = handler;
-	watch->destroy = destroy;
-	watch->user_data = user_data;
-	watch->id = get_next_id(&genl->next_watch_id);
-	l_queue_push_tail(genl->unicast_watches, watch);
+	watch->super.destroy = destroy;
+	watch->super.notify_data = user_data;
 
-	return watch->id;
+	return l_notifylist_add(genl->unicast_watches, &watch->super);
 }
 
 /**
@@ -1319,29 +1283,10 @@ LIB_EXPORT unsigned int l_genl_add_unicast_watch(struct l_genl *genl,
 LIB_EXPORT bool l_genl_remove_unicast_watch(struct l_genl *genl,
 							unsigned int id)
 {
-	struct unicast_watch *watch;
-
 	if (unlikely(!genl))
 		return false;
 
-	if (genl->in_unicast_watch_notify) {
-		watch = l_queue_find(genl->unicast_watches, unicast_watch_match,
-							L_UINT_TO_PTR(id));
-		if (!watch)
-			return false;
-
-		watch->id = 0;
-		return true;
-	}
-
-	watch = l_queue_remove_if(genl->unicast_watches, unicast_watch_match,
-							L_UINT_TO_PTR(id));
-	if (!watch)
-		return false;
-
-	unicast_watch_free(watch);
-
-	return true;
+	return l_notifylist_remove(genl->unicast_watches, id);
 }
 
 /**
@@ -1910,10 +1855,22 @@ LIB_EXPORT bool l_genl_family_cancel(struct l_genl_family *family,
 	if (request)
 		goto done;
 
-	request = l_queue_remove_if(genl->pending_list, match_request_id,
+	request = l_queue_find(genl->pending_list, match_request_id,
 							L_UINT_TO_PTR(id));
 	if (!request)
 		return false;
+
+	/*
+	 * A message in-flight still needs to wait for NLMSG_DONE so clean up
+	 * for the caller but keep the request queued until its done.
+	 */
+	if (request->destroy)
+		request->destroy(request->user_data);
+
+	request->callback = NULL;
+	request->destroy = NULL;
+
+	return true;
 
 done:
 	destroy_request(request);

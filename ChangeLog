@@ -1,3 +1,43 @@
+ver 0.67:
+	Add support for handling sysctl char settings.
+
+ver 0.66:
+	Fix issue with handling event callback when stopping ACD.
+	Fix issue with handling ICMPv6 DNS and domain lists.
+	Add support for notification lists.
+
+ver 0.65:
+	Add support for bitmaps manipulation macros.
+
+ver 0.64:
+	Fix issue with casting in C++ environment.
+	Fix issue with ASCII string upper and lower helpers.
+
+ver 0.63:
+	Fix issue with handling ending boundary of the PEM.
+
+ver 0.62:
+	Add support for cleanup functions and macros.
+	Add support for setting DHCP max attempts.
+
+ver 0.61:
+	Fix issue with not setting DHCP MAC address on start.
+	Fix issue with missing NLM_F_ACK_TLVS and NLM_F_CAPPED.
+
+ver 0.60:
+	Fix issue with missing NETLINK_EXT_ACK definition.
+	Fix issue with incorrect derivation of ECC compressed points.
+	Add support for ECC usage from SPAKE2+ key exchange protocol.
+
+ver 0.59:
+	Fix issue with symbol visibility.
+
+ver 0.58:
+	Add support for handling sysctl settings.
+
+ver 0.57:
+	Fix issue with handling Generic Netlink cancel requests.
+
 ver 0.56:
 	Add support for TLS session resume interfaces.
 

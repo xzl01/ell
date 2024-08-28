@@ -61,7 +61,10 @@ pkginclude_HEADERS = ell/ell.h \
 			ell/acd.h \
 			ell/tester.h \
 			ell/cleanup.h \
-			ell/netconfig.h
+			ell/netconfig.h \
+			ell/sysctl.h \
+			ell/minheap.h \
+			ell/notifylist.h
 
 lib_LTLIBRARIES = ell/libell.la
 
@@ -149,7 +152,10 @@ ell_libell_la_SOURCES = $(linux_headers) \
 			ell/icmp6-private.h \
 			ell/acd.c \
 			ell/tester.c \
-			ell/netconfig.c
+			ell/netconfig.c \
+			ell/sysctl.c \
+			ell/minheap.c \
+			ell/notifylist.c
 
 ell_libell_la_LDFLAGS = -Wl,--no-undefined \
 			-Wl,--version-script=$(top_srcdir)/ell/ell.sym \
@@ -199,7 +205,10 @@ unit_tests = unit/test-unit \
 			unit/test-ecdh \
 			unit/test-time \
 			unit/test-path \
-			unit/test-net
+			unit/test-net \
+			unit/test-sysctl \
+			unit/test-minheap \
+			unit/test-notifylist
 
 dbus_tests = unit/test-hwdb \
 			unit/test-dbus \
@@ -252,8 +261,10 @@ cert_checks = unit/cert-intca \
 			unit/cert-client \
 			unit/cert-no-keyid
 
+if TESTS
 if MAINTAINER_MODE
 noinst_PROGRAMS += $(unit_tests) $(dbus_tests) $(cert_tests)
+endif
 endif
 
 unit_test_unit_LDADD = ell/libell-private.la
@@ -346,20 +357,26 @@ unit_test_path_LDADD = ell/libell-private.la
 
 unit_test_net_LDADD = ell/libell-private.la
 
+unit_test_sysctl_LDADD = ell/libell-private.la
+
+unit_test_minheap_LDADD = ell/libell-private.la
+
+unit_test_notifylist_LDADD = ell/libell-private.la
+
 unit_test_data_files = unit/settings.test unit/dbus.conf
 
-examples = examples/dbus-service examples/https-client-test \
-		examples/https-server-test examples/dbus-client \
-		examples/dhcp-client examples/dhcp6-client \
-		examples/dhcp-server examples/acd-client \
-		examples/netconfig-test
+if EXAMPLES
+if MAINTAINER_MODE
+noinst_PROGRAMS += examples/dbus-service examples/https-client-test \
+			examples/https-server-test examples/dbus-client \
+			examples/dhcp-client examples/dhcp6-client \
+			examples/dhcp-server examples/acd-client \
+			examples/netconfig-test
 
 if GLIB
-examples += examples/glib-eventloop
+noinst_PROGRAMS += examples/glib-eventloop
 endif
-
-if MAINTAINER_MODE
-noinst_PROGRAMS += $(examples)
+endif
 endif
 
 examples_dbus_service_LDADD = ell/libell-private.la
@@ -374,8 +391,11 @@ examples_dhcp_server_LDADD = ell/libell-private.la
 examples_acd_client_LDADD = ell/libell-private.la
 examples_netconfig_test_LDADD = ell/libell-private.la
 
+if TOOLS
 noinst_PROGRAMS += tools/certchain-verify tools/genl-discover \
 		   tools/genl-watch tools/genl-request tools/gpio
+endif
+
 tools_certchain_verify_SOURCES = tools/certchain-verify.c
 tools_certchain_verify_LDADD = ell/libell-private.la
 
@@ -676,10 +696,12 @@ unit/key-signature.dat: unit/plaintext.txt unit/cert-client-key-pkcs1.pem
 unit/key-signature.h: unit/key-signature.dat
 	$(AM_V_GEN)xxd -i < $< > $@
 
+if TESTS
 if MAINTAINER_MODE
 BUILT_SOURCES = unit/key-plaintext.h unit/key-ciphertext.h unit/key-signature.h
 
 check-local: $(cert_checks)
+endif
 endif
 
 clean-local:

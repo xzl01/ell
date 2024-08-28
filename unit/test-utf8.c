@@ -1,23 +1,9 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
+ * Copyright (C) 2024  Cruise, LLC
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -934,6 +920,64 @@ static void test_utf8_to_utf16(const void *test_data)
 	l_free(utf16);
 }
 
+static void test_ascii_toupper(const void *data)
+{
+	assert(l_ascii_toupper('c') == 'C');
+	assert(l_ascii_toupper('z') == 'Z');
+	assert(l_ascii_toupper('a') == 'A');
+	assert(l_ascii_toupper('A') == 'A');
+	assert(l_ascii_toupper('Z') == 'Z');
+	assert(l_ascii_toupper(' ') == ' ');
+	assert(l_ascii_toupper('0') == '0');
+	assert(l_ascii_toupper('9') == '9');
+}
+
+static void test_ascii_tolower(const void *data)
+{
+	assert(l_ascii_tolower('c') == 'c');
+	assert(l_ascii_tolower('z') == 'z');
+	assert(l_ascii_tolower('a') == 'a');
+	assert(l_ascii_tolower('A') == 'a');
+	assert(l_ascii_tolower('Z') == 'z');
+	assert(l_ascii_tolower(' ') == ' ');
+	assert(l_ascii_tolower('0') == '0');
+	assert(l_ascii_tolower('9') == '9');
+}
+
+static void test_ascii_strup(const void *data)
+{
+	char *str;
+
+	str = l_ascii_strup("1234abcdefz.09\t\nSUV", -1);
+	assert(!strcmp(str, "1234ABCDEFZ.09\t\nSUV"));
+	l_free(str);
+
+	str = l_ascii_strup("aBCDEF", 10);
+	assert(!strcmp(str, "ABCDEF"));
+	l_free(str);
+
+	str = l_ascii_strup("1234abcdefz.09", 12);
+	assert(!strcmp(str, "1234ABCDEFZ."));
+	l_free(str);
+}
+
+static void test_ascii_strdown(const void *data)
+{
+	char *str;
+
+	str = l_ascii_strdown("1234ABCDEFZ.09\t\nSUV", -1);
+	assert(!strcmp(str, "1234abcdefz.09\t\nsuv"));
+	l_free(str);
+
+	str = l_ascii_strdown("aBCDEF", 10);
+	assert(!strcmp(str, "abcdef"));
+	l_free(str);
+
+	str = l_ascii_strdown("1234abCDEFZ.09", 12);
+	assert(!strcmp(str, "1234abcdefz."));
+	l_free(str);
+}
+
 int main(int argc, char *argv[])
 {
 	l_test_init(&argc, &argv);
@@ -1115,6 +1159,11 @@ int main(int argc, char *argv[])
 					&utf8_from_utf16_test1);
 	l_test_add("utf8_to_utf16 2", test_utf8_to_utf16,
 					&utf8_from_utf16_test2);
+
+	l_test_add("ascii/toupper", test_ascii_toupper, NULL);
+	l_test_add("ascii/tolower", test_ascii_tolower, NULL);
+	l_test_add("ascii/strup", test_ascii_strup, NULL);
+	l_test_add("ascii/strdown", test_ascii_strdown, NULL);
 
 	return l_test_run();
 }

@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifndef __ELL_LOG_H
@@ -32,6 +17,7 @@ extern "C" {
 
 #define L_LOG_ERR	3
 #define L_LOG_WARNING	4
+#define L_LOG_NOTICE	5
 #define L_LOG_INFO	6
 #define L_LOG_DEBUG	7
 
@@ -99,6 +85,7 @@ void l_debug_disable(void);
 
 #define l_error(format, ...)  l_log(L_LOG_ERR, format, ##__VA_ARGS__)
 #define l_warn(format, ...)   l_log(L_LOG_WARNING, format, ##__VA_ARGS__)
+#define l_notice(format, ...) l_log(L_LOG_NOTICE, format, ##__VA_ARGS__)
 #define l_info(format, ...)   l_log(L_LOG_INFO, format, ##__VA_ARGS__)
 #define l_debug(format, ...)  L_DEBUG_SYMBOL(__debug_desc, format, ##__VA_ARGS__)
 

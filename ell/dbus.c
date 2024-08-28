@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -30,8 +15,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netdb.h>
 #include <errno.h>
 
 #include "util.h"
@@ -1148,6 +1135,112 @@ static struct l_dbus *setup_unix(char *params)
 	return setup_dbus1(fd, guid);
 }
 
+static bool setup_tcp_cb(struct l_io *io, void *user_data)
+{
+	static const unsigned char creds = 0x00;
+	struct l_dbus *dbus = user_data;
+	struct l_dbus_classic *classic;
+	ssize_t written;
+	int fd = l_io_get_fd(io);
+
+	/* Send special credentials-passing nul byte */
+	written = L_TFR(send(fd, &creds, 1, 0));
+	if (written < 1) {
+		l_util_debug(dbus->debug_handler, dbus->debug_handler,
+						"error writing NUL byte");
+		close(fd);
+		return false;
+	}
+
+	dbus->driver = &classic_ops;
+	dbus->negotiate_unix_fd = false;
+	dbus->support_unix_fd = false;
+
+	classic = l_container_of(dbus, struct l_dbus_classic, super);
+	classic->match_strings = l_hashmap_new();
+	classic->auth_command = l_strdup("AUTH ANONYMOUS\r\n");
+	classic->auth_state = WAITING_FOR_OK;
+
+	l_io_set_read_handler(dbus->io, auth_read_handler, dbus, NULL);
+	l_io_set_write_handler(dbus->io, auth_write_handler, dbus, NULL);
+
+	return auth_write_handler(dbus->io, dbus);
+}
+
+static struct l_dbus *setup_tcp(char *params)
+{
+	char *host = NULL;
+	char *port = NULL;
+	char *family = NULL;
+	struct addrinfo hints = { 0 };
+	struct addrinfo *res;
+	struct addrinfo *iter;
+	struct l_dbus *dbus = NULL;
+
+	while (params) {
+		char *key = strsep(&params, ",");
+		char *value;
+
+		value = strchr(key, '=');
+		if (!value)
+			continue;
+
+		*value++ = '\0';
+
+		if (!strcmp(key, "host"))
+			host = value;
+		else if (!strcmp(key, "port"))
+			port = value;
+		else if (!strcmp(key, "family"))
+			family = value;
+	}
+
+	if (!host || !port)
+		return NULL;
+
+	if (!family)
+		hints.ai_family = AF_UNSPEC;
+	else if (!strcmp(family, "ipv4"))
+		hints.ai_family = AF_INET;
+	else if (!strcmp(family, "ipv6"))
+		hints.ai_family = AF_INET6;
+	else
+		return NULL;
+
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+	hints.ai_protocol = IPPROTO_TCP;
+
+	if (getaddrinfo(host, port, &hints, &res) != 0)
+		return NULL;
+
+	for (iter = res; iter; iter = iter->ai_next) {
+		int fd;
+		struct l_dbus_classic *classic;
+
+		fd = socket(iter->ai_family, iter->ai_socktype | SOCK_NONBLOCK,
+					iter->ai_protocol);
+		if (fd < 0)
+			continue;
+
+		if (connect(fd, iter->ai_addr, iter->ai_addrlen) < 0) {
+			if (errno != EINPROGRESS) {
+				close(fd);
+				continue;
+			}
+		}
+
+		classic = l_new(struct l_dbus_classic, 1);
+		dbus = &classic->super;
+		dbus_init(dbus, fd);
+		l_io_set_write_handler(dbus->io, setup_tcp_cb, dbus, NULL);
+		break;
+	}
+
+	freeaddrinfo(res);
+	return dbus;
+}
+
 static struct l_dbus *setup_address(const char *address)
 {
 	struct l_dbus *dbus = NULL;
@@ -1169,6 +1262,9 @@ static struct l_dbus *setup_address(const char *address)
 		if (!strcmp(transport, "unix")) {
 			/* Function will modify params string */
 			dbus = setup_unix(params);
+			break;
+		} else if (!strcmp(transport, "tcp")) {
+			dbus = setup_tcp(params);
 			break;
 		}
 	}
@@ -1704,8 +1800,7 @@ LIB_EXPORT unsigned int l_dbus_add_signal_watch(struct l_dbus *dbus,
 	va_start(args, member);
 
 	rule_len = 0;
-	while ((type = va_arg(args, enum l_dbus_match_type)) !=
-			L_DBUS_MATCH_NONE)
+	while (va_arg(args, enum l_dbus_match_type) != L_DBUS_MATCH_NONE)
 		rule_len++;
 
 	va_end(args);

@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2011-2014  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2011-2014  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -35,11 +20,17 @@
 #define WAIT_ANY (-1) /* Any process */
 #endif
 
-#define TEST_BUS_ADDRESS "unix:path=/tmp/ell-test-bus"
+#define TEST_BUS_ADDRESS_UNIX "unix:path=/tmp/ell-test-bus"
+#define TEST_BUS_ADDRESS_TCP "tcp:host=127.0.0.1,port=14046"
 
 static pid_t dbus_daemon_pid = -1;
 
-static void start_dbus_daemon(void)
+static int tests_completed = 0;
+static bool bus_became_ready = false;
+static bool match_cb_called = false;
+static bool req_name_cb_called = false;
+
+static bool start_dbus_daemon(void)
 {
 	char *prg_argv[5];
 	char *prg_envp[1];
@@ -58,7 +49,7 @@ static void start_dbus_daemon(void)
 	pid = fork();
 	if (pid < 0) {
 		l_error("failed to fork new process");
-		return;
+		return false;
 	}
 
 	if (pid == 0) {
@@ -69,6 +60,8 @@ static void start_dbus_daemon(void)
 	l_info("dbus-daemon process %d created", pid);
 
 	dbus_daemon_pid = pid;
+
+	return true;
 }
 
 static void signal_handler(uint32_t signo, void *user_data)
@@ -107,6 +100,17 @@ static void do_debug(const char *str, void *user_data)
 
 	l_info("%s%s", prefix, str);
 }
+
+#define test_assert(cond)	\
+	do {	\
+		if (!(cond)) {	\
+			l_info("TEST FAILED in %s at %s:%i: %s",	\
+				__func__, __FILE__, __LINE__,	\
+				L_STRINGIFY(cond));	\
+			l_main_quit();	\
+			return;	\
+		}	\
+	} while (0)
 
 static void signal_message(struct l_dbus_message *message, void *user_data)
 {
@@ -150,18 +154,18 @@ static void request_name_callback(struct l_dbus_message *message,
 	const char *error, *text;
 	uint32_t result;
 
+	req_name_cb_called = true;
+
 	if (l_dbus_message_get_error(message, &error, &text)) {
 		l_error("error=%s", error);
 		l_error("message=%s", text);
-		goto done;
+		test_assert(false);
 	}
 
-	if (!l_dbus_message_get_arguments(message, "u", &result))
-		goto done;
+	test_assert(l_dbus_message_get_arguments(message, "u", &result));
 
 	l_info("request name result=%d", result);
 
-done:
 	l_main_quit();
 }
 
@@ -176,21 +180,41 @@ static void add_match_callback(struct l_dbus_message *message, void *user_data)
 {
 	const char *error, *text;
 
+	match_cb_called = true;
+
 	if (l_dbus_message_get_error(message, &error, &text)) {
 		l_error("error=%s", error);
 		l_error("message=%s", text);
+		test_assert(false);
 		return;
 	}
 
-	if (!l_dbus_message_get_arguments(message, ""))
-		return;
+	test_assert(l_dbus_message_get_arguments(message, ""));
 
 	l_info("add match");
 }
 
 static void ready_callback(void *user_data)
 {
+	struct l_dbus *dbus = user_data;
+	int rc;
+
 	l_info("ready");
+	bus_became_ready = true;
+
+	rc = l_dbus_method_call(dbus, "org.freedesktop.DBus",
+				"/org/freedesktop/DBus",
+				"org.freedesktop.DBus", "AddMatch",
+				add_match_setup,
+				add_match_callback, NULL, NULL);
+	test_assert(rc > 0);
+
+	rc = l_dbus_method_call(dbus, "org.freedesktop.DBus",
+				"/org/freedesktop/DBus",
+				"org.freedesktop.DBus", "RequestName",
+				request_name_setup,
+				request_name_callback, NULL, NULL);
+	test_assert(rc > 0);
 }
 
 static void disconnect_callback(void *user_data)
@@ -198,31 +222,29 @@ static void disconnect_callback(void *user_data)
 	l_main_quit();
 }
 
-int main(int argc, char *argv[])
+static void test_dbus(const void *data)
 {
+	const char *address = data;
 	struct l_dbus *dbus;
-	struct l_signal *sigchld;
 	int i;
 
-	if (!l_main_init())
-		return -1;
+	bus_became_ready = false;
+	match_cb_called = false;
+	req_name_cb_called = false;
+
+	test_assert(l_main_init());
 
 	l_log_set_stderr();
-
-	start_dbus_daemon();
 
 	for (i = 0; i < 10; i++) {
 		usleep(200 * 1000);
 
-		dbus = l_dbus_new(TEST_BUS_ADDRESS);
+		dbus = l_dbus_new(address);
 		if (dbus)
 			break;
 	}
 
-	sigchld = l_signal_create(SIGCHLD, sigchld_handler, NULL, NULL);
-
-	if (!dbus)
-		goto done;
+	test_assert(dbus);
 
 	l_dbus_set_debug(dbus, do_debug, "[DBUS] ", NULL);
 
@@ -231,29 +253,40 @@ int main(int argc, char *argv[])
 
 	l_dbus_register(dbus, signal_message, NULL, NULL);
 
-	l_dbus_method_call(dbus, "org.freedesktop.DBus",
-				"/org/freedesktop/DBus",
-				"org.freedesktop.DBus", "AddMatch",
-				add_match_setup,
-				add_match_callback, NULL, NULL);
-
-	l_dbus_method_call(dbus, "org.freedesktop.DBus",
-				"/org/freedesktop/DBus",
-				"org.freedesktop.DBus", "RequestName",
-				request_name_setup,
-				request_name_callback, NULL, NULL);
-
 	l_main_run_with_signal(signal_handler, NULL);
 
-	l_dbus_destroy(dbus);
+	test_assert(bus_became_ready);
+	test_assert(match_cb_called);
+	test_assert(req_name_cb_called);
 
-done:
+	l_dbus_destroy(dbus);
+	l_main_exit();
+	tests_completed++;
+}
+
+int main(int argc, char *argv[])
+{
+	struct l_signal *sigchld;
+
+	l_test_init(&argc, &argv);
+
+	l_test_add("Using a unix socket", test_dbus, TEST_BUS_ADDRESS_UNIX);
+	l_test_add("Using a tcp socket", test_dbus, TEST_BUS_ADDRESS_TCP);
+
+	sigchld = l_signal_create(SIGCHLD, sigchld_handler, NULL, NULL);
+
+	if (!start_dbus_daemon())
+		return -1;
+
+	l_test_run();
+
 	if (dbus_daemon_pid > 0)
 		kill(dbus_daemon_pid, SIGKILL);
 
 	l_signal_remove(sigchld);
 
-	l_main_exit();
+	if (tests_completed == 2)
+		return 0;
 
-	return 0;
+	return -1;
 }

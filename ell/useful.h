@@ -1,34 +1,21 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2021  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2021  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
-
-#include <unistd.h>
-#include <errno.h>
-
-#include <ell/util.h>
 
 #define align_len(len, boundary) (((len)+(boundary)-1) & ~((boundary)-1))
 
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
+
+#define SWAP(l, r) \
+	do { typeof(l) __tmp = (l); (l) = (r); (r) = __tmp; } while (0)
+
+#ifndef __always_inline
+#define __always_inline inline __attribute__((always_inline))
+#endif
 
 static inline size_t minsize(size_t a, size_t b)
 {
@@ -72,20 +59,10 @@ static inline unsigned char bit_field(const unsigned char oct,
 	_x / _d;					\
 })
 
-#define __AUTODESTRUCT(func)				\
-	__attribute((cleanup(func ## _cleanup)))
-
+#ifndef _auto_
 #define _auto_(func)					\
-	__AUTODESTRUCT(func)
-
-/* Enables declaring _auto_(close) int fd = <-1 or L_TFR(open(...))>; */
-inline __attribute__((always_inline)) void close_cleanup(void *p)
-{
-	int fd = *(int *) p;
-
-	if (fd >= 0)
-		L_TFR(close(fd));
-}
+	__L_AUTODESTRUCT(func)
+#endif
 
 /*
  * Trick the compiler into thinking that var might be changed somehow by

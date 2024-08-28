@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2015  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2015  Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #ifdef HAVE_CONFIG_H
@@ -292,7 +277,6 @@ static const struct aead_test_vector gcm_test6 = {
 
 static void test_aead(const void *data)
 {
-	static uint8_t empty[] = { };
 	struct l_aead_cipher *cipher;
 	char *encbuf;
 	size_t encbuflen;
@@ -303,7 +287,7 @@ static void test_aead(const void *data)
 	const struct aead_test_vector *tv = data;
 
 	size_t ptlen = 0;
-	uint8_t *pt = empty;
+	uint8_t *pt = NULL;
 	size_t aadlen = 0;
 	uint8_t *aad = NULL;
 	size_t keylen;
@@ -311,7 +295,7 @@ static void test_aead(const void *data)
 	size_t noncelen;
 	uint8_t *nonce = l_util_from_hexstring(tv->nonce, &noncelen);
 	size_t ctlen = 0;
-	uint8_t *ct = empty;
+	uint8_t *ct = NULL;
 	size_t taglen;
 	uint8_t *tag = l_util_from_hexstring(tv->tag, &taglen);
 

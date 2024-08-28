@@ -1,23 +1,8 @@
 /*
+ * Embedded Linux library
+ * Copyright (C) 2018  Intel Corporation
  *
- *  Embedded Linux library
- *
- *  Copyright (C) 2018 Intel Corporation. All rights reserved.
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- *
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 #include <stdbool.h>
@@ -101,7 +86,10 @@ void _vli_mod_add(uint64_t *result, const uint64_t *left, const uint64_t *right,
 
 void _vli_rshift1(uint64_t *vli, unsigned int ndigits);
 
-bool _vli_mmod_fast(uint64_t *result, uint64_t *product,
+void _vli_mmod_slow(uint64_t *result, const uint64_t *product,
+				const uint64_t *mod, unsigned int ndigits);
+
+bool _vli_mmod_fast(uint64_t *result, const uint64_t *product,
 			const uint64_t *curve_prime, unsigned int ndigits);
 
 void _vli_mod_mult_fast(uint64_t *result, const uint64_t *left,
